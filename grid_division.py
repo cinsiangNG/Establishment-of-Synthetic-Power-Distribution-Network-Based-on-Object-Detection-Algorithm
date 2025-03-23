@@ -14,8 +14,10 @@ import pandas as pd
 
 workingdirectory = '/content/'
 
-LumbertonRoutesPoints = pd.read_csv(workingdirectory + "dense_route_points_test.csv",converters={'RouteID':str})
-RouteIDs = LumbertonRoutesPoints['RTE_NM'].unique() # unique route ID
+LumbertonRoutesPoints = pd.read_csv(workingdirectory + "PanoInfoFinal.csv")
+# LumbertonRoutesPoints = pd.read_csv(workingdirectory + "PanoInfoFinal.csv",converters={'panoid':str})
+# RouteIDs = LumbertonRoutesPoints['RTE_NM'].unique() # unique route ID
+LumbertonRoutesPoints = LumbertonRoutesPoints.drop_duplicates()
 LumbertonRoutesPoints.info()
 
 # prepare required functions
@@ -248,12 +250,10 @@ def create_grid_cells(trajectory_points, effective_distance):
     k = max(1, effective_distance / (4.9 * bl))
     grid_size = k * bl
     print("Answer: k =", k, "grid_size =", grid_size, "baseline =", bl)
-
+    grid_cells = []
     # 计算网格的行数和列数
-    n_cols = math.ceil((max_lon - min_lon) / grid_size)
-    n_rows = math.ceil((max_lat - min_lat) / grid_size)
-
-    # 生成所有网格单元
+    # n_cols = math.ceil((max_lon - min_lon) / grid_size)
+    # n_rows = math.ceil((max_lat - min_lat) / grid_size)
     # grid_cells = []
     # for row in range(n_rows):
     #     for col in range(n_cols):
@@ -262,15 +262,25 @@ def create_grid_cells(trajectory_points, effective_distance):
     #         lat_start = row * grid_size + min_lat
     #         lat_end = (row + 1) * grid_size + min_lat
 
-            # 形成不闭合的网格坐标
-            grid = [
-                [lat_start, lon_start],
-                [lat_end, lon_start],
-                [lat_end, lon_end],
-                [lat_start, lon_end]
-            ]
-            grid_cells.append(grid)
-            print(grid_cells)
+    #         grid = [
+    #             [lat_start, lon_start],
+    #             [lat_end, lon_start],
+    #             [lat_end, lon_end],
+    #             [lat_start, lon_end]
+                # ]
+    #
+    lat_start = min_lat
+    lon_start = min_lon
+    lat_end = max_lat
+    lon_end = max_lon
+    grid = [
+        [lat_start, lon_start],
+        [lat_end, lon_start],
+        [lat_end, lon_end],
+        [lat_start, lon_end]
+        ]
+    grid_cells.append(grid)
+    print(grid_cells)
     return grid_cells
 
 
@@ -330,9 +340,9 @@ def plot_trajectory_and_grid(trajectory_points, grid_cells):
     fig.add_trace(go.Scattermapbox(
         lat=[pt[0] for pt in trajectory_points],
         lon=[pt[1] for pt in trajectory_points],
-        mode='lines+markers',
+        # mode='lines+markers',
         name='Trajectory',
-        line=dict(width=2, color='blue'),
+        # line=dict(width=2, color='blue'),
         marker=dict(size=5, color='blue')
     ))
 
@@ -349,6 +359,56 @@ def plot_trajectory_and_grid(trajectory_points, grid_cells):
             line=dict(width=2, color=grid_color),
             name=f'Grid {i+1}'
         ))
+
+    # 3️⃣ 更新地圖布局
+    fig.update_layout(
+        mapbox=dict(
+            style='carto-positron',
+            zoom=15,
+            center=dict(
+                lat=sum(pt[0] for pt in trajectory_points) / len(trajectory_points),
+                lon=sum(pt[1] for pt in trajectory_points) / len(trajectory_points)
+            )
+        ),
+        height=1200,
+        margin=dict(l=0, r=0, t=0, b=0),
+        showlegend=True,
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01,
+            bgcolor='rgba(255,255,255,0.8)'
+        )
+    )
+
+    return fig
+
+import os
+import pandas as pd
+import plotly.graph_objects as go
+import random
+
+def plot_trajectory(trajectory_points):
+    """
+    視覺化行駛軌跡點與不同顏色的自適應網格
+
+    Args:
+        trajectory_points: 行駛軌跡點 (list of [lat, lon])
+        grid_cells:  自适应网格划分的结果，每个单元是 [[lat1, lon1], [lat2, lon2], ...]
+    """
+    # 創建地圖
+    fig = go.Figure()
+
+    # 1️⃣ 添加行駛軌跡點 (藍色線條)
+    fig.add_trace(go.Scattermapbox(
+        lat=[pt[0] for pt in trajectory_points],
+        lon=[pt[1] for pt in trajectory_points],
+        mode='markers',
+        name='Trajectory',
+        marker=dict(size=5, color='blue')
+    ))
+
 
     # 3️⃣ 更新地圖布局
     fig.update_layout(
@@ -421,6 +481,128 @@ for rr in range(0,len(RouteIDs)):
         # print("Grid Cell information: ", grid_cells)
         fig = plot_trajectory_and_grid(trajectory_points, grid_cells)
         fig.show()
+
+import numpy as np
+import pandas as pd
+from streetlevel import streetview
+
+# 参数设置
+dist_para = [40*304.8, 1.5, 4.55, 10]
+size = (640, 640)
+EFFECTIVE_DISTANCE = 50  # 有效采集距离(米)
+
+# 文件路径
+path1 = workingdirectory + 'StreetViewImages/'
+path2 = workingdirectory + 'resized/'
+savepreddir = workingdirectory + 'PolePredictionResults/'
+
+totaldownload = 0
+trajectory_points = LumbertonRoutesPoints[['Lat','Lon']].values.tolist()
+print(len(trajectory_points))
+grid_cells = create_grid_cells(trajectory_points,EFFECTIVE_DISTANCE)
+    # # 只处理超过3个全景点的路段
+    # if len(PanoInfoFinal) > 3:
+    #     poleview = []  # 路径上的结果 [相机坐标, 杆体方位角]
+    #     poleLOB = []   # 建议的LOB [起点坐标(相机), 终点坐标]
+
+    #     # 自适应网格划分
+    #     trajectory_points = PanoInfoFinal[['lat','lon']].values.tolist()
+    #     grid_cells = create_grid_cells(trajectory_points, EFFECTIVE_DISTANCE)
+
+    #     # # 计算网格大小
+    #     # k = max(1, EFFECTIVE_DISTANCE/(4.9*baseline))
+    #     # grid_size = baseline * k
+    #     # print("Answer:k= ", k,"grid_size= ", grid_size, "baseline= ", baseline)
+    #     # print("Total Grid created: ", len(grid_cells))
+    #     # print("Grid Cell information: ", grid_cells)
+
+fig = plot_trajectory_and_grid(trajectory_points, grid_cells)
+fig.show()
+
+import numpy as np
+import networkx as nx
+from geopy.distance import geodesic
+import plotly.graph_objects as go
+
+print(len(trajectory_points))
+# 計算地理距離的距離矩陣
+n = len(trajectory_points)
+dist_matrix = np.zeros((n, n))
+for i in range(n):
+    for j in range(i + 1, n):
+        dist = geodesic(trajectory_points[i], trajectory_points[j]).meters  # 計算兩點之間的距離（以米為單位）
+        dist_matrix[i, j] = dist_matrix[j, i] = dist
+
+# 建立圖（所有點相連，權重為地理距離）
+G = nx.Graph()
+for i in range(n):
+    for j in range(i + 1, n):
+        G.add_edge(i, j, weight=dist_matrix[i, j])
+
+# 計算 MST（最小生成樹）
+MST = nx.minimum_spanning_tree(G, algorithm='prim')
+
+# 取出 MST 連線的點
+lats, lons = zip(*trajectory_points)  # 拆分緯度和經度
+edges_x = []
+edges_y = []
+
+# 連線的 x, y 座標
+for edge in MST.edges():
+    i, j = edge
+    edges_x.append([lons[i], lons[j]])
+    edges_y.append([lats[i], lats[j]])
+
+# 畫圖
+fig = go.Figure()
+
+# 畫出電線杆座標
+fig.add_trace(go.Scattermapbox(
+    lat=lats,
+    lon=lons,
+    mode='markers',
+    name='Electric Poles',
+    marker=dict(
+        size=7,
+        color='red',
+        opacity=0.8
+    )
+))
+
+# 畫出 MST 連線
+for x, y in zip(edges_x, edges_y):
+    fig.add_trace(go.Scattermapbox(
+        lat=y,
+        lon=x,
+        mode='lines',
+        line=dict(width=2, color='blue'),
+        name='MST Connections'
+    ))
+
+# 更新布局
+fig.update_layout(
+    mapbox=dict(
+        style='carto-positron',
+        zoom=15,
+        center=dict(
+            lat=np.mean(lats),
+            lon=np.mean(lons)
+        )
+    ),
+    height=800,
+    margin=dict(l=0, r=0, t=0, b=0),
+    showlegend=True,
+    legend=dict(
+        yanchor="top",
+        y=0.99,
+        xanchor="left",
+        x=0.01,
+        bgcolor='rgba(255,255,255,0.8)'
+    )
+)
+
+# 顯示圖
+fig.show()
 
 import numpy as np
 import pandas as pd
