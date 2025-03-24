@@ -195,6 +195,35 @@ def calculate_baseline_length(trajectory_points):
     # 返回平均段长作为基线长度
     return total_length / (len(trajectory_points)-1)
 
+from geopy.distance import geodesic
+
+def calculate_mst_baseline(trajectory_points, MST):
+    """
+    计算 MST 的基线长度
+
+    Args:
+        trajectory_points: 轨迹点列表 [[lat, lon],...]
+        MST: NetworkX 计算出的最小生成树 (Minimum Spanning Tree)
+
+    Returns:
+        baseline: 基线长度(米)
+    """
+    total_length = 0
+    edge_count = 0
+
+    for i, j in MST.edges():
+        pt1 = trajectory_points[i]
+        pt2 = trajectory_points[j]
+        length = geodesic(pt1, pt2).meters  # 計算地理距離
+        total_length += length
+        edge_count += 1
+        print(i,j, trajectory_points[i], trajectory_points[j])
+
+    # 返回平均邊長作為基線
+    return total_length / edge_count if edge_count > 0 else 0
+
+
+
 def create_grid_cell(pt1, pt2, grid_size, bearing):
     """
     创建单个网格单元
@@ -554,39 +583,147 @@ for edge in MST.edges():
     edges_y.append([lats[i], lats[j]])
 
 # 畫圖
+# fig = go.Figure()
+
+# # 畫出電線杆座標
+# fig.add_trace(go.Scattermapbox(
+#     lat=lats,
+#     lon=lons,
+#     mode='markers',
+#     name='Electric Poles',
+#     marker=dict(
+#         size=7,
+#         color='red',
+#         opacity=0.8
+#     )
+# ))
+
+# # 畫出 MST 連線
+# for x, y in zip(edges_x, edges_y):
+#     fig.add_trace(go.Scattermapbox(
+#         lat=y,
+#         lon=x,
+#         mode='lines',
+#         line=dict(width=2, color='blue'),
+#         name='MST Connections'
+#     ))
+
+# # 更新布局
+# fig.update_layout(
+#     mapbox=dict(
+#         style='carto-positron',
+#         zoom=15,
+#         center=dict(
+#             lat=np.mean(lats),
+#             lon=np.mean(lons)
+#         )
+#     ),
+#     height=800,
+#     margin=dict(l=0, r=0, t=0, b=0),
+#     showlegend=True,
+#     legend=dict(
+#         yanchor="top",
+#         y=0.99,
+#         xanchor="left",
+#         x=0.01,
+#         bgcolor='rgba(255,255,255,0.8)'
+#     )
+# )
+
+# # 顯示圖
+# fig.show()
+
+# 計算基線長度
+baseline_length = calculate_mst_baseline(trajectory_points, MST)
+print("MST Baseline Length:", baseline_length, "meters")
+
+grid_cells_flatten = grid_cells[0]
+print(grid_cells_flatten)
+#左下，左上，右上，右下
+k = (1+(50/(2*math.sqrt(2)*baseline_length)))/2
+print(50/(2*math.sqrt(2)*baseline_length))
+print(k)
+dist_y = geodesic(grid_cells_flatten[1],grid_cells_flatten[0]).meters
+dist_x = geodesic(grid_cells_flatten[2],grid_cells_flatten[1]).meters
+print("垂直距離：",dist_y, "\n水平距離：",dist_x)
+nrow = math.ceil(dist_y/(k*baseline_length))
+ncol = math.ceil(dist_x/(k*baseline_length))
+print("nrow: ",nrow, "\nncol: ",ncol)
+
+import numpy as np
+from geopy.distance import geodesic
+
+# 获取四个角点
+p1, p2, p3, p4 = grid_cells_flatten[:4]
+
+# 计算步长
+step_y = dist_y / nrow
+step_x = dist_x / ncol
+
+# 生成网格点
+lat_values = np.linspace(p1[0], p2[0], nrow + 1)  # 纵向切分点
+lon_values = np.linspace(p1[1], p3[1], ncol + 1)  # 横向切分点
+
+# 存储所有 grid cells
+each_grid_cells = []
+
+# 迭代生成所有小网格
+for i in range(nrow):
+    for j in range(ncol):
+        lat1, lat2 = lat_values[i], lat_values[i + 1]
+        lon1, lon2 = lon_values[j], lon_values[j + 1]
+
+        # 构造一个 grid cell
+        grid_cell = [
+            [lat1, lon1],  # 左下角
+            [lat2, lon1],  # 左上角
+            [lat2, lon2],  # 右上角
+            [lat1, lon2],  # 右下角
+            [lat1, lon1]
+        ]
+
+        each_grid_cells.append(grid_cell)
+
+# 输出示例
+print(f"总网格数: {len(each_grid_cells)}")
+print("示例网格:", each_grid_cells)
+
+import plotly.graph_objects as go
+import numpy as np
+
 fig = go.Figure()
 
-# 畫出電線杆座標
-fig.add_trace(go.Scattermapbox(
-    lat=lats,
-    lon=lons,
-    mode='markers',
-    name='Electric Poles',
-    marker=dict(
-        size=7,
-        color='red',
-        opacity=0.8
-    )
-))
 
-# 畫出 MST 連線
-for x, y in zip(edges_x, edges_y):
+for grid_cell in grid_cells:
+    lat_values = [pt[0] for pt in grid_cell]
+    lon_values = [pt[1] for pt in grid_cell]
     fig.add_trace(go.Scattermapbox(
-        lat=y,
-        lon=x,
+        lat=lat_values,
+        lon=lon_values,
         mode='lines',
         line=dict(width=2, color='blue'),
-        name='MST Connections'
+        name='Outer Grid Cell'
     ))
 
-# 更新布局
+for grid_cell in each_grid_cells[15500:16000]:
+    lat_values = [pt[0] for pt in grid_cell]
+    lon_values = [pt[1] for pt in grid_cell]
+    fig.add_trace(go.Scattermapbox(
+        lat=lat_values,
+        lon=lon_values,
+        mode='lines',
+        line=dict(width=2, color='green'),
+        name='Grid Cell'
+    ))
+
+# 更新佈局
 fig.update_layout(
     mapbox=dict(
         style='carto-positron',
         zoom=15,
         center=dict(
-            lat=np.mean(lats),
-            lon=np.mean(lons)
+            lat=np.mean([pt[0] for cell in each_grid_cells for pt in cell]),
+            lon=np.mean([pt[1] for cell in each_grid_cells for pt in cell])
         )
     ),
     height=800,
