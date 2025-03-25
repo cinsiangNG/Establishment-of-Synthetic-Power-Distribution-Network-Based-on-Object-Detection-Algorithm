@@ -774,62 +774,6 @@ for lat, lon in zip(lats, lons):
 
 # 這樣每個 MST 點都會對應一個 grid(recorded) 及其周圍 9 個 grid(calculation)
 
-# import plotly.graph_objects as go
-# import numpy as np
-
-# fig = go.Figure()
-
-# # 畫出 grid_calculation（藍色）
-# for grid_info_item in grid_info:
-#     grid_calculation = grid_info_item["calculation"]
-#     lat_values = [pt[0] for pt in grid_calculation]
-#     lon_values = [pt[1] for pt in grid_calculation]
-#     fig.add_trace(go.Scattermapbox(
-#         lat=lat_values,
-#         lon=lon_values,
-#         mode='lines',
-#         line=dict(width=2, color='blue'),
-#         name='Grid Calculation'
-#     ))
-
-# # 畫出 grid_recorded（紅色）
-# for grid_info_item in grid_info:
-#     grid_recorded = grid_info_item["recorded"]["grid"]
-#     lat_values = [pt[0] for pt in grid_recorded]
-#     lon_values = [pt[1] for pt in grid_recorded]
-#     fig.add_trace(go.Scattermapbox(
-#         lat=lat_values,
-#         lon=lon_values,
-#         mode='lines',
-#         line=dict(width=2, color='red'),
-#         name='Grid Recorded'
-#     ))
-
-# # 更新佈局
-# fig.update_layout(
-#     mapbox=dict(
-#         style='carto-positron',
-#         zoom=15,
-#         center=dict(
-#             lat=np.mean([pt[0] for info in grid_info for pt in info["recorded"]["grid"]]),
-#             lon=np.mean([pt[1] for info in grid_info for pt in info["recorded"]["grid"]])
-#         )
-#     ),
-#     height=800,
-#     margin=dict(l=0, r=0, t=0, b=0),
-#     showlegend=True,
-#     legend=dict(
-#         yanchor="top",
-#         y=0.99,
-#         xanchor="left",
-#         x=0.01,
-#         bgcolor='rgba(255,255,255,0.8)'
-#     )
-# )
-
-# # 顯示圖
-# print(grid_info[0])
-# fig.show()
 import plotly.graph_objects as go
 import numpy as np
 
@@ -890,4 +834,68 @@ fig.update_layout(
 
 # 顯示圖
 print(first_grid_info)
+fig.show()
+
+import plotly.graph_objects as go
+import numpy as np
+
+fig = go.Figure()
+
+# 記錄所有點的經緯度，以便計算地圖中心
+all_lats = []
+all_lons = []
+
+# 遍歷 grid_info[50:100]
+for grid_data in grid_info[50:500]:
+    # 繪製 grid_calculation（藍色）
+    grid_calculation = grid_data["calculation"]
+    lat_values = [pt[1] for pt in grid_calculation]  # 緯度
+    lon_values = [pt[0] for pt in grid_calculation]  # 經度
+    fig.add_trace(go.Scattermapbox(
+        lat=lat_values,
+        lon=lon_values,
+        mode='lines',
+        line=dict(width=2, color='blue'),
+        name='Grid Calculation'
+    ))
+
+    # 繪製 grid_recorded（紅色）
+    grid_recorded = grid_data["recorded"]["grid"]
+    lat_values = [pt[1] for pt in grid_recorded]  # 緯度
+    lon_values = [pt[0] for pt in grid_recorded]  # 經度
+    fig.add_trace(go.Scattermapbox(
+        lat=lat_values,
+        lon=lon_values,
+        mode='lines',
+        line=dict(width=2, color='red'),
+        name='Grid Recorded'
+    ))
+
+    # 累積所有點的經緯度
+    all_lats.extend([pt[1] for pt in grid_calculation + grid_recorded])
+    all_lons.extend([pt[0] for pt in grid_calculation + grid_recorded])
+
+# 設定地圖中心
+fig.update_layout(
+    mapbox=dict(
+        style='open-street-map',  # 使用免費地圖
+        zoom=12,  # 適當縮放
+        center=dict(
+            lat=np.mean(all_lats),
+            lon=np.mean(all_lons)
+        )
+    ),
+    height=800,
+    margin=dict(l=0, r=0, t=0, b=0),
+    showlegend=True,
+    legend=dict(
+        yanchor="top",
+        y=0.99,
+        xanchor="left",
+        x=0.01,
+        bgcolor='rgba(255,255,255,0.8)'
+    )
+)
+
+# 顯示圖表
 fig.show()
