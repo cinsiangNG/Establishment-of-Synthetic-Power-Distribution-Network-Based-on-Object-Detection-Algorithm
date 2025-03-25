@@ -501,13 +501,6 @@ for rr in range(0,len(RouteIDs)):
         # 自适应网格划分
         trajectory_points = PanoInfoFinal[['lat','lon']].values.tolist()
         grid_cells = create_grid_cells(trajectory_points, EFFECTIVE_DISTANCE)
-
-        # # 计算网格大小
-        # k = max(1, EFFECTIVE_DISTANCE/(4.9*baseline))
-        # grid_size = baseline * k
-        # print("Answer:k= ", k,"grid_size= ", grid_size, "baseline= ", baseline)
-        # print("Total Grid created: ", len(grid_cells))
-        # print("Grid Cell information: ", grid_cells)
         fig = plot_trajectory_and_grid(trajectory_points, grid_cells)
         fig.show()
 
@@ -529,21 +522,6 @@ totaldownload = 0
 trajectory_points = LumbertonRoutesPoints[['Lat','Lon']].values.tolist()
 print(len(trajectory_points))
 grid_cells = create_grid_cells(trajectory_points,EFFECTIVE_DISTANCE)
-    # # 只处理超过3个全景点的路段
-    # if len(PanoInfoFinal) > 3:
-    #     poleview = []  # 路径上的结果 [相机坐标, 杆体方位角]
-    #     poleLOB = []   # 建议的LOB [起点坐标(相机), 终点坐标]
-
-    #     # 自适应网格划分
-    #     trajectory_points = PanoInfoFinal[['lat','lon']].values.tolist()
-    #     grid_cells = create_grid_cells(trajectory_points, EFFECTIVE_DISTANCE)
-
-    #     # # 计算网格大小
-    #     # k = max(1, EFFECTIVE_DISTANCE/(4.9*baseline))
-    #     # grid_size = baseline * k
-    #     # print("Answer:k= ", k,"grid_size= ", grid_size, "baseline= ", baseline)
-    #     # print("Total Grid created: ", len(grid_cells))
-    #     # print("Grid Cell information: ", grid_cells)
 
 fig = plot_trajectory_and_grid(trajectory_points, grid_cells)
 fig.show()
@@ -742,122 +720,163 @@ fig.update_layout(
 fig.show()
 
 import numpy as np
-import pandas as pd
-from streetlevel import streetview
 
-# 参数设置
-dist_para = [40*304.8, 1.5, 4.55, 10]
-size = (640, 640)
-EFFECTIVE_DISTANCE = 50  # 有效采集距离(米)
+# 計算每個 MST 點所屬的 grid(recorded)
+min_lon = min(pt[1] for pt in trajectory_points)  # 经度
+max_lon = max(pt[1] for pt in trajectory_points)
+min_lat = min(pt[0] for pt in trajectory_points)  # 纬度
+max_lat = max(pt[0] for pt in trajectory_points)
+bl=baseline_length
 
-# 文件路径
-path1 = workingdirectory + 'StreetViewImages/'
-path2 = workingdirectory + 'resized/'
-savepreddir = workingdirectory + 'PolePredictionResults/'
+# 記錄每個 MST 點對應的 grid(recorded) 及其周圍的 grid(calculation)
+grid_info = []
 
-totaldownload = 0
+# 轉換比例
+def meters_to_lat(meters):
+    return meters / 110540  # 1度緯度約110540米
 
-for rr in range(0,len(RouteIDs)):
-    routeid = RouteIDs[rr]
-    routepoints = LumbertonRoutesPoints.loc[LumbertonRoutesPoints['RTE_NM'] == routeid]
-    Pts2downloadPano = routepoints[['Lat','Lon']].values.tolist()
+def meters_to_lon(meters, lat):
+    return meters / (111320 * np.cos(np.radians(lat)))  # 1度經度約111320米 * cos(緯度)
 
-    # 获取街景全景信息
-    allpanoid = []
-    for panoLatLon in Pts2downloadPano:
-        pano = streetview.find_panorama(lat=panoLatLon[0], lon=panoLatLon[1])
-        if bool(pano):
-            allpanoid.append([pano.id, pano.lat, pano.lon])
-    PanoInfoFinal = pd.DataFrame(allpanoid,columns=['panoid','lat','lon']).drop_duplicates()
-    print(PanoInfoFinal)
+for lat, lon in zip(lats, lons):
+    delta_lat = meters_to_lat(k * bl)
+    delta_lon = meters_to_lon(k * bl, lat)
 
-    # 只处理超过3个全景点的路段
-    if len(PanoInfoFinal) > 3:
-        poleview = []  # 路径上的结果 [相机坐标, 杆体方位角]
-        poleLOB = []   # 建议的LOB [起点坐标(相机), 终点坐标]
+    col = int((lon - min_lon) / delta_lon)
+    row = int((lat - min_lat) / delta_lat)
 
-        # 自适应网格划分
-        trajectory_points = PanoInfoFinal[['lat','lon']].values.tolist()
-        grid_cells = adaptive_grid_division(trajectory_points, EFFECTIVE_DISTANCE)
-        fig = plot_trajectory_and_grid(trajectory_points, grid_cells)
-        fig.show()
+    grid_recorded = {
+        "row": row,
+        "col": col,
+        "grid": [
+            [min_lon + col * delta_lon, min_lat + row * delta_lat],  # 左下
+            [min_lon + (col + 1) * delta_lon, min_lat + row * delta_lat],  # 右下
+            [min_lon + (col + 1) * delta_lon, min_lat + (row + 1) * delta_lat],  # 右上
+            [min_lon + col * delta_lon, min_lat + (row + 1) * delta_lat],  # 左上
+            [min_lon + col * delta_lon, min_lat + row * delta_lat]  # 回到左下
+        ]
+    }
 
-import numpy as np
-import pandas as pd
-from streetlevel import streetview
+    # 計算 grid(calculation) 範圍 (包含周圍8個 grid)
+    grid_calculation = [
+        [min_lon + (col - 1) * delta_lon, min_lat + (row - 1) * delta_lat],  # 左下
+        [min_lon + (col + 2) * delta_lon, min_lat + (row - 1) * delta_lat],  # 右下
+        [min_lon + (col + 2) * delta_lon, min_lat + (row + 2) * delta_lat],  # 右上
+        [min_lon + (col - 1) * delta_lon, min_lat + (row + 2) * delta_lat],  # 左上
+        [min_lon + (col - 1) * delta_lon, min_lat + (row - 1) * delta_lat]  # 回到左下
+    ]
+
+    grid_info.append({
+        "recorded": grid_recorded,
+        "calculation": grid_calculation
+    })
+
+
+# 這樣每個 MST 點都會對應一個 grid(recorded) 及其周圍 9 個 grid(calculation)
+
+# import plotly.graph_objects as go
+# import numpy as np
+
+# fig = go.Figure()
+
+# # 畫出 grid_calculation（藍色）
+# for grid_info_item in grid_info:
+#     grid_calculation = grid_info_item["calculation"]
+#     lat_values = [pt[0] for pt in grid_calculation]
+#     lon_values = [pt[1] for pt in grid_calculation]
+#     fig.add_trace(go.Scattermapbox(
+#         lat=lat_values,
+#         lon=lon_values,
+#         mode='lines',
+#         line=dict(width=2, color='blue'),
+#         name='Grid Calculation'
+#     ))
+
+# # 畫出 grid_recorded（紅色）
+# for grid_info_item in grid_info:
+#     grid_recorded = grid_info_item["recorded"]["grid"]
+#     lat_values = [pt[0] for pt in grid_recorded]
+#     lon_values = [pt[1] for pt in grid_recorded]
+#     fig.add_trace(go.Scattermapbox(
+#         lat=lat_values,
+#         lon=lon_values,
+#         mode='lines',
+#         line=dict(width=2, color='red'),
+#         name='Grid Recorded'
+#     ))
+
+# # 更新佈局
+# fig.update_layout(
+#     mapbox=dict(
+#         style='carto-positron',
+#         zoom=15,
+#         center=dict(
+#             lat=np.mean([pt[0] for info in grid_info for pt in info["recorded"]["grid"]]),
+#             lon=np.mean([pt[1] for info in grid_info for pt in info["recorded"]["grid"]])
+#         )
+#     ),
+#     height=800,
+#     margin=dict(l=0, r=0, t=0, b=0),
+#     showlegend=True,
+#     legend=dict(
+#         yanchor="top",
+#         y=0.99,
+#         xanchor="left",
+#         x=0.01,
+#         bgcolor='rgba(255,255,255,0.8)'
+#     )
+# )
+
+# # 顯示圖
+# print(grid_info[0])
+# fig.show()
 import plotly.graph_objects as go
-import random
+import numpy as np
 
-# 参数设置
-dist_para = [40 * 304.8, 1.5, 4.55, 10]
-size = (640, 640)
-EFFECTIVE_DISTANCE = 50  # 有效采集距离(米)
-
-# 文件路径
-path1 = workingdirectory + 'StreetViewImages/'
-path2 = workingdirectory + 'resized/'
-savepreddir = workingdirectory + 'PolePredictionResults/'
-
-totaldownload = 0
-
-# 1️⃣ 初始化地圖（只创建一次）
 fig = go.Figure()
 
-# 颜色列表
-colors = ['red', 'green', 'purple', 'brown', 'pink', 'cyan', 'magenta', 'lime', 'teal', 'orange']
+# 取得第一個 grid_calculation 和 grid_recorded
+first_grid_info = grid_info[50]
 
-for rr in range(len(RouteIDs)):
-    routeid = RouteIDs[rr]
-    routepoints = LumbertonRoutesPoints.loc[LumbertonRoutesPoints['RTE_NM'] == routeid]
-    Pts2downloadPano = routepoints[['Lat', 'Lon']].values.tolist()
+# 畫出 grid_calculation（藍色）
+grid_calculation = first_grid_info["calculation"]
+lat_values = [pt[1] for pt in grid_calculation]  # 緯度
+lon_values = [pt[0] for pt in grid_calculation]  # 經度
+fig.add_trace(go.Scattermapbox(
+    lat=lat_values,
+    lon=lon_values,
+    mode='lines',
+    line=dict(width=2, color='blue'),
+    name='Grid Calculation'
+))
 
-    # 获取街景全景信息
-    allpanoid = []
-    for panoLatLon in Pts2downloadPano:
-        pano = streetview.find_panorama(lat=panoLatLon[0], lon=panoLatLon[1])
-        if bool(pano):
-            allpanoid.append([pano.id, pano.lat, pano.lon])
-    PanoInfoFinal = pd.DataFrame(allpanoid, columns=['panoid', 'lat', 'lon']).drop_duplicates()
-    print(PanoInfoFinal)
+# 畫出 grid_recorded（紅色）
+grid_recorded = first_grid_info["recorded"]["grid"]
+lat_values = [pt[1] for pt in grid_recorded]  # 緯度
+lon_values = [pt[0] for pt in grid_recorded]  # 經度
+fig.add_trace(go.Scattermapbox(
+    lat=lat_values,
+    lon=lon_values,
+    mode='lines',
+    line=dict(width=2, color='red'),
+    name='Grid Recorded'
+))
 
-    # 只处理超过3个全景点的路段
-    if len(PanoInfoFinal) > 3:
-        trajectory_points = PanoInfoFinal[['lat', 'lon']].values.tolist()
-        grid_cells = adaptive_grid_division(trajectory_points, EFFECTIVE_DISTANCE)
+# 計算地圖中心點
+all_lats = [pt[1] for pt in grid_recorded + grid_calculation]
+all_lons = [pt[0] for pt in grid_recorded + grid_calculation]
 
-        # 2️⃣ 累積行駛軌跡到地圖（藍色線條）
-        fig.add_trace(go.Scattermapbox(
-            lat=[pt[0] for pt in trajectory_points],
-            lon=[pt[1] for pt in trajectory_points],
-            mode='lines+markers',
-            name=f'Trajectory {routeid}',
-            line=dict(width=2, color='blue'),
-            marker=dict(size=5, color='blue')
-        ))
-
-        # 3️⃣ 累積不同顏色的網格
-        for i, cell in enumerate(grid_cells):
-            cell.append(cell[0])  # 闭合多边形
-            grid_color = random.choice(colors)  # 隨機選擇顏色
-            fig.add_trace(go.Scattermapbox(
-                lat=[pt[0] for pt in cell],
-                lon=[pt[1] for pt in cell],
-                mode='lines',
-                line=dict(width=2, color=grid_color),
-                name=f'Grid {routeid}-{i+1}'
-            ))
-
-# 4️⃣ 設定地圖視角
+# 更新佈局
 fig.update_layout(
     mapbox=dict(
-        style='carto-positron',
-        zoom=15,
+        style='open-street-map',  # 使用免費地圖
+        zoom=12,  # 減少 zoom 避免太靠近
         center=dict(
-            lat=sum(pt[0] for pt in trajectory_points) / len(trajectory_points),
-            lon=sum(pt[1] for pt in trajectory_points) / len(trajectory_points)
+            lat=np.mean(all_lats),
+            lon=np.mean(all_lons)
         )
     ),
-    height=1200,
+    height=800,
     margin=dict(l=0, r=0, t=0, b=0),
     showlegend=True,
     legend=dict(
@@ -869,5 +888,6 @@ fig.update_layout(
     )
 )
 
-# 5️⃣ 顯示所有路徑的地圖
+# 顯示圖
+print(first_grid_info)
 fig.show()
