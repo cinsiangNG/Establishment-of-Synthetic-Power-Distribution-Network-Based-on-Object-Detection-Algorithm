@@ -634,6 +634,8 @@ for rr in range(0,len(RouteIDs)):
         fig = plot_trajectory_and_grid(trajectory_points, grid_cells)
         fig.show()
 
+"""# **Create outer grid and do grid division(divide outer large grid into several small grid)**"""
+
 import numpy as np
 import pandas as pd
 from streetlevel import streetview
@@ -655,6 +657,8 @@ grid_cells = create_grid_cells(trajectory_points,EFFECTIVE_DISTANCE)
 
 fig = plot_trajectory_and_grid(trajectory_points, grid_cells)
 fig.show()
+
+"""***- use MST to link the trajectory point and stored them in edge_x and edge_y in increasing order of length(m).***"""
 
 import numpy as np
 import networkx as nx
@@ -745,6 +749,8 @@ for edge in MST.edges():
 baseline_length = calculate_mst_baseline(trajectory_points, MST)
 print("MST Baseline Length:", baseline_length, "meters")
 
+"""***- calculate k, dist_y, dist_x, nrow and ncol.***"""
+
 grid_cells_flatten = grid_cells[0]
 print(grid_cells_flatten)
 #左下，左上，右上，右下
@@ -795,6 +801,8 @@ for i in range(nrow):
 # 输出示例
 print(f"总网格数: {len(each_grid_cells)}")
 print("示例网格:", each_grid_cells)
+
+"""# **Visualise the grid cell**"""
 
 import plotly.graph_objects as go
 import numpy as np
@@ -848,6 +856,8 @@ fig.update_layout(
 
 # 顯示圖
 fig.show()
+
+"""# **Create grid_info which contain the grid for record and also calculation.**"""
 
 import numpy as np
 
@@ -903,6 +913,8 @@ for lat, lon in zip(lats, lons):
 
 
 # 這樣每個 MST 點都會對應一個 grid(recorded) 及其周圍 9 個 grid(calculation)
+
+"""# **Visualise grid for record and also calculation**"""
 
 import plotly.graph_objects as go
 import numpy as np
@@ -1041,6 +1053,8 @@ LOBS = LOBS.drop_duplicates(subset=["start_lat", "start_lon", "end_lat", "end_lo
 LOBS.to_csv("/content/poleLOB_drop_duplicates.csv")
 print(len(LOBS))
 
+"""# **Remove duplicate of LOBS and also categorize them in proper grid respectively.**"""
+
 from shapely.geometry import Point, Polygon
 
 for grid in grid_info:
@@ -1065,13 +1079,15 @@ for grid in grid_info:
 print(len(grid_info[1991]['lobs_in_polygon']))
 print(grid_info[1151]['lobs_in_polygon'])
 
+"""# **Visualise the grid for calculation and LOBs inside the grid**"""
+
 import plotly.graph_objects as go
 import numpy as np
 
 fig = go.Figure()
 
 # 取得指定 grid_info
-first_grid_info = grid_info[1991]
+first_grid_info = grid_info[1151]
 
 # 畫出 grid_calculation（藍色）
 grid_calculation = first_grid_info["calculation"]
@@ -1158,12 +1174,12 @@ for grid in grid_info[1150:1175]:
     all_lats.extend(lat_values)
     all_lons.extend(lon_values)
     fig.add_trace(go.Scattermapbox(
-        lat=lat_values + [lat_values[0]],  # 閉合多邊形
+        lat=lat_values + [lat_values[0]],
         lon=lon_values + [lon_values[0]],
         mode='lines',
         line=dict(width=2, color='blue'),
         name='Grid Calculation',
-        showlegend=False  # 避免重複圖例
+        showlegend=False
     ))
 
     # 畫出 grid_recorded（紅色）
@@ -1217,3 +1233,75 @@ fig.update_layout(
 )
 
 fig.show()
+
+"""# **Append 2 tupple in grid_info(intersections and lobs_intersection)**
+***- to find the intersection of LOBs in grid***
+"""
+
+from shapely.geometry import LineString
+
+for grid in grid_info:
+    grid_polygon_coords = grid['calculation']
+    polygon = Polygon(grid_polygon_coords)
+
+    lobs = grid.get('lobs_in_polygon', [])
+    intersections = set()
+    intersection_lobs = set()
+
+    # 兩兩配對找交點
+    for i in range(len(lobs)):
+        for j in range(i + 1, len(lobs)):
+            lob1 = lobs[i]
+            lob2 = lobs[j]
+
+            line1 = LineString([(lob1[1], lob1[0]), (lob1[3], lob1[2])])  # (lon, lat)
+            line2 = LineString([(lob2[1], lob2[0]), (lob2[3], lob2[2])])
+
+            if line1.intersects(line2):
+                intersection = line1.intersection(line2)
+
+                # 檢查是否為點，並且該點在 grid polygon 裡
+                if intersection.geom_type == 'Point' and polygon.contains(intersection):
+                    intersections.add((intersection.y, intersection.x))  # 存為 (lat, lon)
+                    intersection_lobs.add(tuple(lob1))
+                    intersection_lobs.add(tuple(lob2))
+
+    # 存回 grid
+    grid['intersections'] = [list(pt) for pt in intersections]
+    grid['intersection_lobs'] = [list(lob) for lob in intersection_lobs]
+
+from shapely.geometry import LineString, Polygon
+
+# 只針對第 1151 個 grid 做交點與交叉 LOB 的檢查
+grid = grid_info[1500]
+grid_polygon_coords = grid['calculation']
+polygon = Polygon(grid_polygon_coords)
+
+lobs = grid.get('lobs_in_polygon', [])
+intersections = set()
+intersection_lobs = set()
+
+# 兩兩配對找交點
+for i in range(len(lobs)):
+    for j in range(i + 1, len(lobs)):
+        lob1 = lobs[i]
+        lob2 = lobs[j]
+
+        line1 = LineString([(lob1[1], lob1[0]), (lob1[3], lob1[2])])  # (lon, lat)
+        line2 = LineString([(lob2[1], lob2[0]), (lob2[3], lob2[2])])
+
+        if line1.intersects(line2):
+            intersection = line1.intersection(line2)
+
+            # 檢查是否為點，並且該點在 grid polygon 裡
+            if intersection.geom_type == 'Point' and polygon.contains(intersection):
+                intersections.add((intersection.y, intersection.x))  # 存為 (lat, lon)
+                intersection_lobs.add(tuple(lob1))
+                intersection_lobs.add(tuple(lob2))
+
+# 存回 grid_info[1151]
+grid['intersections'] = [list(pt) for pt in intersections]
+grid['intersection_lobs'] = [list(lob) for lob in intersection_lobs]
+
+print(len(grid_info[1151]['intersections']))
+print(len(grid_info[1151]['intersection_lobs']))
