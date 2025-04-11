@@ -1047,8 +1047,8 @@ for grid in grid_info:
     grid['intersections'] = [list(pt) for pt in intersections]
     grid['intersection_lobs'] = [list(lob) for lob in intersection_lobs]
 
-print(len(grid_info[1151]['intersections']))
-print(len(grid_info[1151]['intersection_lobs']))
+print(len(grid_info[1155]['intersections']))
+print(len(grid_info[1155]['intersection_lobs']))
 
 """# **Visualise the grid for calculation and intersectinon_LOBs inside the grid**"""
 
@@ -1139,10 +1139,11 @@ import numpy as np
 from shapely.geometry import LineString, Point
 from collections import defaultdict
 import matplotlib.pyplot as plt
+intersection_points_dict = {}
 
 intersection_lobs = [
     [float(a), float(b), float(c), float(d)]
-    for a, b, c, d in grid_info[1151]['intersection_lobs']
+    for a, b, c, d in grid_info[1155]['intersection_lobs']
 ]
 
 start_point_groups = defaultdict(list)
@@ -1179,39 +1180,35 @@ for i in range(n):
 
         if line1.intersects(line2):
             matrix[i][j] = f"P({label1}x{label2})"
+            intersection_points_dict[(label1, label2)] = (intersection.y, intersection.x)
 
 df_matrix = pd.DataFrame(matrix, columns=label_list, index=label_list)
 display(df_matrix)
+
+"""Save the intersection between each set of LOBS in a dictionaries"""
 
 import pandas as pd
 import numpy as np
 from shapely.geometry import LineString, Point
 from collections import defaultdict
-import matplotlib.pyplot as plt
-from sklearn.cluster import DBSCAN
 
-# 设定距离阈值 t (单位：公里或米)
-t = 0.0001  # 示例值，可以根据实际需求调整
-
-# 获取交点 LOB 数据
+# 處理 intersection_lobs
 intersection_lobs = [
     [float(a), float(b), float(c), float(d)]
     for a, b, c, d in grid_info[1151]['intersection_lobs']
 ]
 
-# 按起点对 LOB 数据进行分组
+# 分群根據起點
 start_point_groups = defaultdict(list)
-
 for lob in intersection_lobs:
-    start = (lob[0], lob[1])
+    start = (lob[0], lob[1])  # (lat, lon)
     start_point_groups[start].append(lob)
 
-# 为每个 LOB 加上标签
+# 標記 A1, A2, ..., B1, ...
 labels = {}
 label_prefix = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 lob_list = []
 label_index = 0
-
 for group_start, lobs in sorted(start_point_groups.items()):
     for i, lob in enumerate(lobs):
         label = f"{label_prefix[label_index]}{i+1}"
@@ -1219,60 +1216,173 @@ for group_start, lobs in sorted(start_point_groups.items()):
         lob_list.append((lob, label))
     label_index += 1
 
-# 计算交点矩阵并初始化
+# 初始化 matrix 和交點記錄 dict
 n = len(lob_list)
 matrix = [['-' for _ in range(n)] for _ in range(n)]
 label_list = [label for _, label in lob_list]
+intersection_points_dict = {}
 
-# 创建交点矩阵
+# 比對交點
 for i in range(n):
     for j in range(n):
         if i == j:
             matrix[i][j] = '—'
             continue
+
         lob1, label1 = lob_list[i]
         lob2, label2 = lob_list[j]
-        line1 = LineString([(lob1[1], lob1[0]), (lob1[3], lob1[2])])
+        line1 = LineString([(lob1[1], lob1[0]), (lob1[3], lob1[2])])  # (lon, lat)
         line2 = LineString([(lob2[1], lob2[0]), (lob2[3], lob2[2])])
 
         if line1.intersects(line2):
-            matrix[i][j] = f"P({label1}x{label2})"
+            intersection = line1.intersection(line2)
+            if intersection.geom_type == 'Point':
+                matrix[i][j] = f"P({label1}x{label2})"
+                intersection_points_dict[(label1, label2)] = (intersection.y, intersection.x)  # lat, lon
+                intersection_points_dict[(label2, label1)] = (intersection.y, intersection.x)
 
-# 计算交点的坐标并聚类
-points = []
-for lob in lob_list:
-    line = LineString([(lob[1], lob[0]), (lob[3], lob[2])])
-    if line.intersects:
-        intersection_point = line.intersection(line)
-        if isinstance(intersection_point, Point):
-            points.append([intersection_point.x, intersection_point.y])
-
-# 使用 DBSCAN 聚类算法按距离 t 进行聚类
-db = DBSCAN(eps=t, min_samples=1, metric='euclidean')
-clusters = db.fit_predict(points)
-
-# 将聚类结果添加到交点矩阵中，并为每个交点根据聚类上色
-cluster_colors = {i: plt.cm.get_cmap('tab20', len(set(clusters)))(i) for i in range(len(set(clusters)))}
-cluster_labels = {lob_list[i][1]: clusters[i] for i in range(n)}
-
-# 根据聚类结果为交点矩阵上色
-fig, ax = plt.subplots(figsize=(10, 8))
-ax.axis('tight')
-ax.axis('off')
-
-# 绘制矩阵并根据聚类为交点添加颜色
-for i in range(n):
-    for j in range(n):
-        if matrix[i][j] != '-':
-            cluster1 = cluster_labels[lob_list[i][1]]
-            cluster2 = cluster_labels[lob_list[j][1]]
-            color = cluster_colors[min(cluster1, cluster2)]  # 可以根据交点的聚类关系决定颜色
-            ax.text(j, i, matrix[i][j], ha='center', va='center', fontsize=12,
-                    bbox=dict(facecolor=color, edgecolor='none', boxstyle='round,pad=0.5'))
-
-# 绘制结果矩阵
-plt.show()
-
-# 将结果转换为 DataFrame 并显示
+# 顯示矩陣
 df_matrix = pd.DataFrame(matrix, columns=label_list, index=label_list)
 display(df_matrix)
+
+# 印出所有交點
+print("所有交點（label 對應的交點座標）:")
+for (label_a, label_b), point in intersection_points_dict.items():
+    print(f"{label_a} x {label_b} -> 交點座標: (lat={point[0]:.6f}, lon={point[1]:.6f})")
+
+from sklearn.cluster import DBSCAN
+import numpy as np
+from math import radians, cos, sin, asin, sqrt
+from collections import defaultdict
+
+# 將所有交點座標轉為 numpy array
+coords = np.array(list(intersection_points_dict.values()))  # [[lat, lon], ...]
+
+# 計算 haversine 距離
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371000  # 地球半徑 (公尺)
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)**2
+    return 2 * R * asin(sqrt(a))
+
+# 自訂 haversine 距離矩陣
+def haversine_distance_matrix(coords):
+    n = len(coords)
+    dist_matrix = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                dist_matrix[i][j] = haversine(coords[i][0], coords[i][1], coords[j][0], coords[j][1])
+    return dist_matrix
+
+# DBSCAN 聚類（eps = 2.5 公尺，min_samples=1 表示自己也能成一群）
+distance_matrix = haversine_distance_matrix(coords)
+db = DBSCAN(eps=2.5, min_samples=1, metric='precomputed')
+labels = db.fit_predict(distance_matrix)
+
+# 為每個 cluster 計算 centroid
+cluster_points = defaultdict(list)
+for i, label in enumerate(labels):
+    cluster_points[label].append(coords[i])
+
+cluster_centroids = {
+    label: np.mean(np.array(pts), axis=0)  # 平均 lat/lon
+    for label, pts in cluster_points.items()
+}
+
+# 將所有交點更新為 centroid
+label_keys = list(intersection_points_dict.keys())
+for i, key in enumerate(label_keys):
+    cluster_id = labels[i]
+    centroid = cluster_centroids[cluster_id]
+    intersection_points_dict[key] = tuple(centroid)
+
+# 印出結果
+print("聚類後交點（使用 centroid 更新）:")
+for (label_a, label_b), point in intersection_points_dict.items():
+    print(f"{label_a} x {label_b} -> 群中心: (lat={point[0]:.6f}, lon={point[1]:.6f})")
+
+import plotly.graph_objects as go
+import numpy as np
+import plotly.express as px
+
+fig = go.Figure()
+
+# 取得指定 grid_info
+first_grid_info = grid_info[1151]
+
+# 畫出 grid_calculation（藍色）
+grid_calculation = first_grid_info["calculation"]
+lat_values = [pt[1] for pt in grid_calculation]
+lon_values = [pt[0] for pt in grid_calculation]
+fig.add_trace(go.Scattermapbox(
+    lat=lat_values + [lat_values[0]],
+    lon=lon_values + [lon_values[0]],
+    mode='lines',
+    line=dict(width=2, color='blue'),
+    name='Grid Calculation'
+))
+
+# 畫出 grid_recorded（紅色）
+grid_recorded = first_grid_info["recorded"]["grid"]
+lat_values = [pt[1] for pt in grid_recorded]
+lon_values = [pt[0] for pt in grid_recorded]
+fig.add_trace(go.Scattermapbox(
+    lat=lat_values + [lat_values[0]],
+    lon=lon_values + [lon_values[0]],
+    mode='lines',
+    line=dict(width=2, color='red'),
+    name='Grid Recorded'
+))
+
+# 📌 顯示 intersection points，根據 cluster 上色
+unique_cluster_ids = set(labels)
+color_scale = px.colors.qualitative.Set1  # 或 Set3、Plotly 等配色方案
+
+for cluster_id in unique_cluster_ids:
+    # 所有屬於這個 cluster 的交點索引
+    indices = np.where(labels == cluster_id)[0]
+    cluster_color = color_scale[cluster_id % len(color_scale)]
+
+    # 提取交點並加到圖上
+    for idx in indices:
+        label_pair = list(intersection_points_dict.keys())[idx]
+        point = intersection_points_dict[label_pair]
+        fig.add_trace(go.Scattermapbox(
+            lat=[point[0]],
+            lon=[point[1]],
+            mode='markers+text',
+            marker=dict(size=10, color=cluster_color),
+            text=[f"Cluster {cluster_id}"],
+            textposition="top right",
+            name=f"Intersection Cluster {cluster_id}",
+            showlegend=False
+        ))
+
+# 計算地圖中心
+all_lats = [pt[1] for pt in grid_recorded + grid_calculation]
+all_lons = [pt[0] for pt in grid_recorded + grid_calculation]
+
+fig.update_layout(
+    mapbox=dict(
+        style='open-street-map',
+        zoom=15,
+        center=dict(
+            lat=np.mean(all_lats),
+            lon=np.mean(all_lons)
+        )
+    ),
+    height=800,
+    margin=dict(l=0, r=0, t=0, b=0),
+    showlegend=True,
+    legend=dict(
+        yanchor="top",
+        y=0.99,
+        xanchor="left",
+        x=0.01,
+        bgcolor='rgba(255,255,255,0.8)'
+    )
+)
+
+fig.show()
