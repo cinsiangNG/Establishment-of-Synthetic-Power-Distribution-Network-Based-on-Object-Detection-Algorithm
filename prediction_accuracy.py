@@ -266,126 +266,6 @@ PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.a
 
 PRDresult
 
-"""# **Aerial View Accuracy(Yolo11+Transformer)**"""
-
-# compute accuracy
-# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
-# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
-import pandas as pd
-import numpy as np
-import math
-
-workingdirectory = "/content/"
-WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "detected_poles_Yolo11_transformer.xlsx") # predicted pole locations
-
-distMax = 2
-polepredgroup = []
-
-polepred = np.array(WHPolePred)
-for i in range(0,len(polepred)):
-  if i not in unnestlist(polepredgroup):
-    pt0 = polepred[i]
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
-    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
-    polepredgroup.append(closepts)
-
-polepredgroup_final = []
-for i in range(0,len(polepredgroup)):
-  lats = polepred[polepredgroup[i],0]
-  lons = polepred[polepredgroup[i],1]
-  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
-
-bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
-
-PctAcc1 =[]
-PctAcc2 =[]
-
-for bb in range(0,len(bufferdist)):
-  poles_in_Buffer1 = 0
-  for i in range(0,len(polepredgroup_final)):
-    pt0 = np.array(polepredgroup_final[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer1 += 1
-  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
-
-  poles_in_Buffer2 = 0
-  for i in range(0,len(WHPoleLoc)):
-    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer2 += 1
-  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
-F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
-PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
-                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
-# PRDresult
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
-
-PRDresult
-
-"""# **Aerial View Ensemble Learning**"""
-
-# compute accuracy
-# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
-# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
-import pandas as pd
-import numpy as np
-import math
-
-workingdirectory = "/content/"
-WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "detected_poles_Yolo11_EL.xlsx") # predicted pole locations
-
-distMax = 2
-polepredgroup = []
-
-polepred = np.array(WHPolePred)
-for i in range(0,len(polepred)):
-  if i not in unnestlist(polepredgroup):
-    pt0 = polepred[i]
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
-    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
-    polepredgroup.append(closepts)
-
-polepredgroup_final = []
-for i in range(0,len(polepredgroup)):
-  lats = polepred[polepredgroup[i],0]
-  lons = polepred[polepredgroup[i],1]
-  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
-
-bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
-
-PctAcc1 =[]
-PctAcc2 =[]
-
-for bb in range(0,len(bufferdist)):
-  poles_in_Buffer1 = 0
-  for i in range(0,len(polepredgroup_final)):
-    pt0 = np.array(polepredgroup_final[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer1 += 1
-  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
-
-  poles_in_Buffer2 = 0
-  for i in range(0,len(WHPoleLoc)):
-    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer2 += 1
-  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
-F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
-PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
-                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
-# PRDresult
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
-
-PRDresult
-
 """# **Aerial View Yolo v8x**"""
 
 # compute accuracy
@@ -398,126 +278,6 @@ import math
 workingdirectory = "/content/"
 WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
 WHPolePred = pd.read_excel(workingdirectory + "detected_poles_Yolov8x.xlsx") # predicted pole locations
-
-distMax = 2
-polepredgroup = []
-
-polepred = np.array(WHPolePred)
-for i in range(0,len(polepred)):
-  if i not in unnestlist(polepredgroup):
-    pt0 = polepred[i]
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
-    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
-    polepredgroup.append(closepts)
-
-polepredgroup_final = []
-for i in range(0,len(polepredgroup)):
-  lats = polepred[polepredgroup[i],0]
-  lons = polepred[polepredgroup[i],1]
-  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
-
-bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
-
-PctAcc1 =[]
-PctAcc2 =[]
-
-for bb in range(0,len(bufferdist)):
-  poles_in_Buffer1 = 0
-  for i in range(0,len(polepredgroup_final)):
-    pt0 = np.array(polepredgroup_final[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer1 += 1
-  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
-
-  poles_in_Buffer2 = 0
-  for i in range(0,len(WHPoleLoc)):
-    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer2 += 1
-  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
-F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
-PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
-                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
-# PRDresult
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
-
-PRDresult
-
-"""# **Street View 100 meter**"""
-
-# compute accuracy
-# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
-# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
-import pandas as pd
-import numpy as np
-import math
-
-workingdirectory = "/content/"
-WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "Streetview_adaptive_constraints.xlsx") # predicted pole locations
-
-distMax = 2
-polepredgroup = []
-
-polepred = np.array(WHPolePred)
-for i in range(0,len(polepred)):
-  if i not in unnestlist(polepredgroup):
-    pt0 = polepred[i]
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
-    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
-    polepredgroup.append(closepts)
-
-polepredgroup_final = []
-for i in range(0,len(polepredgroup)):
-  lats = polepred[polepredgroup[i],0]
-  lons = polepred[polepredgroup[i],1]
-  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
-
-bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
-
-PctAcc1 =[]
-PctAcc2 =[]
-
-for bb in range(0,len(bufferdist)):
-  poles_in_Buffer1 = 0
-  for i in range(0,len(polepredgroup_final)):
-    pt0 = np.array(polepredgroup_final[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer1 += 1
-  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
-
-  poles_in_Buffer2 = 0
-  for i in range(0,len(WHPoleLoc)):
-    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer2 += 1
-  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
-F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
-PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
-                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
-# PRDresult
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
-
-PRDresult
-
-"""# **Street View 50 meter**"""
-
-# compute accuracy
-# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
-# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
-import pandas as pd
-import numpy as np
-import math
-
-workingdirectory = "/content/"
-WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "Streetview_adaptive_constraints_50m.xlsx") # predicted pole locations
 
 distMax = 2
 polepredgroup = []
@@ -746,66 +506,6 @@ PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.a
 
 PRDresult
 
-"""# **Street View 50m + increased data point**"""
-
-# compute accuracy
-# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
-# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
-import pandas as pd
-import numpy as np
-import math
-
-workingdirectory = "/content/"
-WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "Streetview_adaptive_constraints_50m+dataset_increased.xlsx") # predicted pole locations
-
-distMax = 2
-polepredgroup = []
-
-polepred = np.array(WHPolePred)
-for i in range(0,len(polepred)):
-  if i not in unnestlist(polepredgroup):
-    pt0 = polepred[i]
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
-    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
-    polepredgroup.append(closepts)
-
-polepredgroup_final = []
-for i in range(0,len(polepredgroup)):
-  lats = polepred[polepredgroup[i],0]
-  lons = polepred[polepredgroup[i],1]
-  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
-
-bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
-
-PctAcc1 =[]
-PctAcc2 =[]
-
-for bb in range(0,len(bufferdist)):
-  poles_in_Buffer1 = 0
-  for i in range(0,len(polepredgroup_final)):
-    pt0 = np.array(polepredgroup_final[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer1 += 1
-  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
-
-  poles_in_Buffer2 = 0
-  for i in range(0,len(WHPoleLoc)):
-    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer2 += 1
-  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
-F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
-PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
-                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
-# PRDresult
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
-
-PRDresult
-
 """# **Street View Original + Increased point**"""
 
 # compute accuracy
@@ -817,67 +517,7 @@ import math
 
 workingdirectory = "/content/"
 WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "7000testOriginal.xlsx") # predicted pole locations
-
-distMax = 2
-polepredgroup = []
-
-polepred = np.array(WHPolePred)
-for i in range(0,len(polepred)):
-  if i not in unnestlist(polepredgroup):
-    pt0 = polepred[i]
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
-    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
-    polepredgroup.append(closepts)
-
-polepredgroup_final = []
-for i in range(0,len(polepredgroup)):
-  lats = polepred[polepredgroup[i],0]
-  lons = polepred[polepredgroup[i],1]
-  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
-
-bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
-
-PctAcc1 =[]
-PctAcc2 =[]
-
-for bb in range(0,len(bufferdist)):
-  poles_in_Buffer1 = 0
-  for i in range(0,len(polepredgroup_final)):
-    pt0 = np.array(polepredgroup_final[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer1 += 1
-  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
-
-  poles_in_Buffer2 = 0
-  for i in range(0,len(WHPoleLoc)):
-    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer2 += 1
-  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
-F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
-PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
-                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
-# PRDresult
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
-
-PRDresult
-
-"""# **Data Fusion(Old_Dataset_Yolo11+adaptive_constraints_50m)**"""
-
-# compute accuracy
-# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
-# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
-import pandas as pd
-import numpy as np
-import math
-
-workingdirectory = "/content/"
-WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "fused_poles_Yolo11+adaptive_constraints_50m.xlsx") # predicted pole locations
+WHPolePred = pd.read_excel(workingdirectory + "StreetViewOriginal+Increased_point.xlsx") # predicted pole locations
 
 distMax = 2
 polepredgroup = []
@@ -986,126 +626,6 @@ PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.a
 
 PRDresult
 
-"""# **Data Fusion(Old_Dataset_Yolo11+adaptive_constraints_50m_increased)**"""
-
-# compute accuracy
-# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
-# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
-import pandas as pd
-import numpy as np
-import math
-
-workingdirectory = "/content/"
-WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "fused_poles_Yolo11+adaptive_constraints_50m_dataset_increased.xlsx") # predicted pole locations
-
-distMax = 2
-polepredgroup = []
-
-polepred = np.array(WHPolePred)
-for i in range(0,len(polepred)):
-  if i not in unnestlist(polepredgroup):
-    pt0 = polepred[i]
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
-    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
-    polepredgroup.append(closepts)
-
-polepredgroup_final = []
-for i in range(0,len(polepredgroup)):
-  lats = polepred[polepredgroup[i],0]
-  lons = polepred[polepredgroup[i],1]
-  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
-
-bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
-
-PctAcc1 =[]
-PctAcc2 =[]
-
-for bb in range(0,len(bufferdist)):
-  poles_in_Buffer1 = 0
-  for i in range(0,len(polepredgroup_final)):
-    pt0 = np.array(polepredgroup_final[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer1 += 1
-  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
-
-  poles_in_Buffer2 = 0
-  for i in range(0,len(WHPoleLoc)):
-    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer2 += 1
-  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
-F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
-PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
-                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
-# PRDresult
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
-
-PRDresult
-
-"""# **Data Fusion(New_Dataset_Yolo11x+adaptive_constraints_50m)**"""
-
-# compute accuracy
-# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
-# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
-import pandas as pd
-import numpy as np
-import math
-
-workingdirectory = "/content/"
-WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "fused_poles_newdataset_Yolo11x+adaptive_constraints_50m.xlsx") # predicted pole locations
-
-distMax = 2
-polepredgroup = []
-
-polepred = np.array(WHPolePred)
-for i in range(0,len(polepred)):
-  if i not in unnestlist(polepredgroup):
-    pt0 = polepred[i]
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
-    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
-    polepredgroup.append(closepts)
-
-polepredgroup_final = []
-for i in range(0,len(polepredgroup)):
-  lats = polepred[polepredgroup[i],0]
-  lons = polepred[polepredgroup[i],1]
-  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
-
-bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
-
-PctAcc1 =[]
-PctAcc2 =[]
-
-for bb in range(0,len(bufferdist)):
-  poles_in_Buffer1 = 0
-  for i in range(0,len(polepredgroup_final)):
-    pt0 = np.array(polepredgroup_final[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer1 += 1
-  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
-
-  poles_in_Buffer2 = 0
-  for i in range(0,len(WHPoleLoc)):
-    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer2 += 1
-  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
-F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
-PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
-                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
-# PRDresult
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
-
-PRDresult
-
 """# **Data Fusion(New_Dataset_Yolo11x+OriginalStreetView_incresed)**"""
 
 # compute accuracy
@@ -1118,66 +638,6 @@ import math
 workingdirectory = "/content/"
 WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
 WHPolePred = pd.read_excel(workingdirectory + "fused_poles_newdataset_Yolo11x+OriginalStreetview_incresed.xlsx") # predicted pole locations
-
-distMax = 2
-polepredgroup = []
-
-polepred = np.array(WHPolePred)
-for i in range(0,len(polepred)):
-  if i not in unnestlist(polepredgroup):
-    pt0 = polepred[i]
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
-    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
-    polepredgroup.append(closepts)
-
-polepredgroup_final = []
-for i in range(0,len(polepredgroup)):
-  lats = polepred[polepredgroup[i],0]
-  lons = polepred[polepredgroup[i],1]
-  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
-
-bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
-
-PctAcc1 =[]
-PctAcc2 =[]
-
-for bb in range(0,len(bufferdist)):
-  poles_in_Buffer1 = 0
-  for i in range(0,len(polepredgroup_final)):
-    pt0 = np.array(polepredgroup_final[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer1 += 1
-  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
-
-  poles_in_Buffer2 = 0
-  for i in range(0,len(WHPoleLoc)):
-    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
-    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
-    if min(dist) < bufferdist[bb]:
-      poles_in_Buffer2 += 1
-  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
-F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
-PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
-                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
-# PRDresult
-# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
-
-PRDresult
-
-"""# **Data Fusion(New_Dataset_Yolo11x+adaptive_constraints_50m_increased)**"""
-
-# compute accuracy
-# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
-# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
-import pandas as pd
-import numpy as np
-import math
-
-workingdirectory = "/content/"
-WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "fused_poles_newdataset_Yolo11x+adaptive_constraints_50m_dataset_increased.xlsx") # predicted pole locations
 
 distMax = 2
 polepredgroup = []
@@ -1346,7 +806,7 @@ PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.a
 
 PRDresult
 
-"""# **Debuged Adaptive Constrained LOB-50m**"""
+"""# **Adaptive Constrained LOB-2.5m as a cluster**"""
 
 # compute accuracy
 # PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
@@ -1357,7 +817,603 @@ import math
 
 workingdirectory = "/content/"
 WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
-WHPolePred = pd.read_excel(workingdirectory + "adaptive_constrained_result.xlsx") # predicted pole locations
+WHPolePred = pd.read_excel(workingdirectory + "remaining_coordinates_2.5m.xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+"""# **Adaptive Constrained LOB-5m as a cluster**"""
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "remaining_coordinates_5m.xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+"""# **Adaptive Constrained LOB-without DLSS as a cluster**"""
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "remaining_coordinates_without_DLSS.xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+"""# **Adaptive Constrained LOB-dominant as a cluster**"""
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "remaining_coordinates.xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+"""# **Data Fusion(New_Dataset_Yolo11x+OriginalStreetView_increase(fusion_buffer=5m)**"""
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "fused_poles_newdataset_Yolo11x+streetViewOriginal_increased.xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+"""# **Data Fusion(New_Dataset_Yolo11x+OriginalStreetView_increase(fusion_buffer=2m)**"""
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "fused_poles_newdataset_Yolo11x+streetViewOriginal_increased.xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+"""# **Data Fusion(New_Dataset_Yolo11x+LOB_Adaptive_Constrains(fusion_buffer=2m)**"""
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "fused_poles_newdataset_Yolo11x+LOBconstrainRule(fusion=2m).xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+"""# **Data Fusion(New_Dataset_Yolo11x+LOB_Adaptive_Constrain(without_DLSS)(fusion_buffer=2m)**"""
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "Newdataset_yolo11x+without_DLSS.xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "Newdataset_yolo11x+streetViewOriginal(fusion_buffer=2m).xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+"""# **Adaptive Constrained LOB-2m as a cluster**"""
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "remaining_coordinates_2m.xlsx") # predicted pole locations
+
+distMax = 2
+polepredgroup = []
+
+polepred = np.array(WHPolePred)
+for i in range(0,len(polepred)):
+  if i not in unnestlist(polepredgroup):
+    pt0 = polepred[i]
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepred]
+    closepts = [i for i, x in enumerate(np.array(dist) < distMax) if x]
+    polepredgroup.append(closepts)
+
+polepredgroup_final = []
+for i in range(0,len(polepredgroup)):
+  lats = polepred[polepredgroup[i],0]
+  lons = polepred[polepredgroup[i],1]
+  polepredgroup_final.append([np.mean(lats), np.mean(lons)])
+
+bufferdist = [1,2,3,5,7,10,15,20,25] # buffer distance (meter)
+
+PctAcc1 =[]
+PctAcc2 =[]
+
+for bb in range(0,len(bufferdist)):
+  poles_in_Buffer1 = 0
+  for i in range(0,len(polepredgroup_final)):
+    pt0 = np.array(polepredgroup_final[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in WHPoleLoc.values.tolist()]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer1 += 1
+  PctAcc1.append(poles_in_Buffer1/len(polepredgroup_final))
+
+  poles_in_Buffer2 = 0
+  for i in range(0,len(WHPoleLoc)):
+    pt0 = np.array(WHPoleLoc.loc[i]) # current pole
+    dist = [(lambda x: getPathLength(pt0[0],pt0[1],x[0], x[1]))(x) for x in polepredgroup_final]
+    if min(dist) < bufferdist[bb]:
+      poles_in_Buffer2 += 1
+  PctAcc2.append(poles_in_Buffer2/len(WHPoleLoc))
+F1 = 2 * (np.array(PctAcc1) * np.array(PctAcc2)) / (np.array(PctAcc1) + np.array(PctAcc2))
+PRDresult = pd.DataFrame(np.array([np.array(bufferdist), np.array(PctAcc1), np.array(PctAcc2), F1]).T,
+                        columns=['Buffer(m)', 'Precision', 'Recall', 'F1'])
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1)]).T,columns=['Buffer(m)','PDR'])
+# PRDresult
+# PRDresult = pd.DataFrame(np.array([np.array(bufferdist),np.array(PctAcc1),np.array(PctAcc2)]).T,columns=['Buffer(m)','PDR1','PDR2'])
+
+PRDresult
+
+# compute accuracy
+# PctAcc1: Percentage of the number of actual poles being within a buffer zone of a predicted pole (%)
+# PctAcc2: Percentage of the number of predicted of poles being within a certain buffer zone of actual poles (%)
+import pandas as pd
+import numpy as np
+import math
+
+workingdirectory = "/content/"
+WHPoleLoc = pd.read_excel(workingdirectory + "PoleLocationGT.xlsx",sheet_name='pole') # actual pole locations
+WHPolePred = pd.read_excel(workingdirectory + "fused_poles_newdataset_Yolo11x+LOBconstrainRule(fusion=3m).xlsx") # predicted pole locations
 
 distMax = 2
 polepredgroup = []
