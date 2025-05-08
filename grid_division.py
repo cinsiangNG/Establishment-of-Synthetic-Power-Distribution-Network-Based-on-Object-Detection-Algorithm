@@ -370,47 +370,6 @@ def plot_trajectory(trajectory_points):
 
     return fig
 
-import numpy as np
-import pandas as pd
-from streetlevel import streetview
-
-# 参数设置
-dist_para = [40*304.8, 1.5, 4.55, 10]
-size = (640, 640)
-EFFECTIVE_DISTANCE = 50  # 有效采集距离(米)
-
-# 文件路径
-path1 = workingdirectory + 'StreetViewImages/'
-path2 = workingdirectory + 'resized/'
-savepreddir = workingdirectory + 'PolePredictionResults/'
-
-totaldownload = 0
-
-for rr in range(0,len(RouteIDs)):
-    routeid = RouteIDs[rr]
-    routepoints = LumbertonRoutesPoints.loc[LumbertonRoutesPoints['RTE_NM'] == routeid]
-    Pts2downloadPano = routepoints[['Lat','Lon']].values.tolist()
-
-    # 获取街景全景信息
-    allpanoid = []
-    for panoLatLon in Pts2downloadPano:
-        pano = streetview.find_panorama(lat=panoLatLon[0], lon=panoLatLon[1])
-        if bool(pano):
-            allpanoid.append([pano.id, pano.lat, pano.lon])
-    PanoInfoFinal = pd.DataFrame(allpanoid,columns=['panoid','lat','lon']).drop_duplicates()
-    print(PanoInfoFinal)
-
-    # 只处理超过3个全景点的路段
-    if len(PanoInfoFinal) > 3:
-        poleview = []  # 路径上的结果 [相机坐标, 杆体方位角]
-        poleLOB = []   # 建议的LOB [起点坐标(相机), 终点坐标]
-
-        # 自适应网格划分
-        trajectory_points = PanoInfoFinal[['lat','lon']].values.tolist()
-        grid_cells = create_grid_cells(trajectory_points, EFFECTIVE_DISTANCE)
-        fig = plot_trajectory_and_grid(trajectory_points, grid_cells)
-        fig.show()
-
 """# **Create outer grid and do grid division(divide outer large grid into several small grid)**"""
 
 import numpy as np
@@ -699,7 +658,7 @@ import numpy as np
 fig = go.Figure()
 
 # 取得第一個 grid_calculation 和 grid_recorded
-first_grid_info = grid_info[50]
+first_grid_info = grid_info[1884]
 
 # 畫出 grid_calculation（藍色）
 grid_calculation = first_grid_info["calculation"]
@@ -864,7 +823,7 @@ import numpy as np
 fig = go.Figure()
 
 # 取得指定 grid_info
-first_grid_info = grid_info[1151]
+first_grid_info = grid_info[1155]
 
 # 畫出 grid_calculation（藍色）
 grid_calculation = first_grid_info["calculation"]
@@ -1047,8 +1006,8 @@ for grid in grid_info:
     grid['intersections'] = [list(pt) for pt in intersections]
     grid['intersection_lobs'] = [list(lob) for lob in intersection_lobs]
 
-print(len(grid_info[1155]['intersections']))
-print(len(grid_info[1155]['intersection_lobs']))
+print((grid_info[1155]['intersections']))
+print((grid_info[1155]['intersection_lobs']))
 
 """# **Visualise the grid for calculation and intersectinon_LOBs inside the grid**"""
 
@@ -1132,60 +1091,10 @@ fig.show()
 
 print(grid_info[1151]['intersection_lobs'])
 
-"""# **Create Intersection Matrix**"""
+"""# **Create Intersection Matrix**
 
-import pandas as pd
-import numpy as np
-from shapely.geometry import LineString, Point
-from collections import defaultdict
-import matplotlib.pyplot as plt
-intersection_points_dict = {}
-
-intersection_lobs = [
-    [float(a), float(b), float(c), float(d)]
-    for a, b, c, d in grid_info[1155]['intersection_lobs']
-]
-
-start_point_groups = defaultdict(list)
-
-for lob in intersection_lobs:
-    start = (lob[0], lob[1])
-    start_point_groups[start].append(lob)
-
-labels = {}
-label_prefix = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-lob_list = []
-label_index = 0
-
-for group_start, lobs in sorted(start_point_groups.items()):
-    for i, lob in enumerate(lobs):
-        label = f"{label_prefix[label_index]}{i+1}"
-        labels[tuple(lob)] = label
-        lob_list.append((lob, label))
-    label_index += 1
-
-n = len(lob_list)
-matrix = [['-' for _ in range(n)] for _ in range(n)]
-label_list = [label for _, label in lob_list]
-
-for i in range(n):
-    for j in range(n):
-        if i == j:
-            matrix[i][j] = '—'
-            continue
-        lob1, label1 = lob_list[i]
-        lob2, label2 = lob_list[j]
-        line1 = LineString([(lob1[1], lob1[0]), (lob1[3], lob1[2])])
-        line2 = LineString([(lob2[1], lob2[0]), (lob2[3], lob2[2])])
-
-        if line1.intersects(line2):
-            matrix[i][j] = f"P({label1}x{label2})"
-            intersection_points_dict[(label1, label2)] = (intersection.y, intersection.x)
-
-df_matrix = pd.DataFrame(matrix, columns=label_list, index=label_list)
-display(df_matrix)
-
-"""Save the intersection between each set of LOBS in a dictionaries"""
+Save the intersection between each set of LOBS in a dictionaries
+"""
 
 import pandas as pd
 import numpy as np
@@ -1338,7 +1247,7 @@ fig.add_trace(go.Scattermapbox(
 
 # 📌 顯示 intersection points，根據 cluster 上色
 unique_cluster_ids = set(labels)
-color_scale = px.colors.qualitative.Set1  # 或 Set3、Plotly 等配色方案
+color_scale = px.colors.qualitative.Alphabet  # 或 Set3、Plotly 等配色方案
 
 for cluster_id in unique_cluster_ids:
     # 所有屬於這個 cluster 的交點索引
@@ -1386,3 +1295,804 @@ fig.update_layout(
 )
 
 fig.show()
+
+import pandas as pd
+import numpy as np
+import plotly.express as px
+
+# 建立顏色表，每個 cluster 對應一個顏色
+unique_cluster_ids = sorted(set(labels))
+color_palette = px.colors.qualitative.Alphabet
+cluster_colors = {
+    cid: color_palette[cid % len(color_palette)]
+    for cid in unique_cluster_ids
+}
+
+# 建立 intersection 對應的 cluster 字典，讓我們知道哪個交點屬於哪個 cluster
+intersection_to_cluster = {
+    key: cluster_id
+    for key, cluster_id in zip(intersection_points_dict.keys(), labels)
+}
+
+# 樣式函數，根據位置 i, j 決定是否要上色
+def highlight_intersections(val, row_idx, col_idx):
+    label1 = df_matrix.index[row_idx]
+    label2 = df_matrix.columns[col_idx]
+
+    # 交點字典的 key 有兩種排列順序
+    key1 = (label1, label2)
+    key2 = (label2, label1)
+
+    if key1 in intersection_to_cluster:
+        cluster_id = intersection_to_cluster[key1]
+    elif key2 in intersection_to_cluster:
+        cluster_id = intersection_to_cluster[key2]
+    else:
+        return ''  # 無交點，不上色
+
+    color = cluster_colors[cluster_id]
+    return f'background-color: {color}; color: black;'
+
+# 建立樣式 DataFrame
+def style_df(df):
+    styled = df.style
+
+    for i in range(df.shape[0]):
+        for j in range(df.shape[1]):
+            styled = styled.set_properties(
+                subset=pd.IndexSlice[df.index[i], df.columns[j]],
+                **{
+                    'background-color': highlight_intersections(df.iat[i, j], i, j).replace('background-color:', '').split(';')[0],
+                    'color': 'black'
+                }
+            )
+    return styled
+
+# 顯示加色後的矩陣
+styled_df = style_df(df_matrix)
+styled_df
+
+def simplify_matrix(matrix_df, intersection_to_cluster, cluster_colors):
+    n = matrix_df.shape[0]
+    simplified = matrix_df.copy()
+
+    for i in range(n):
+        for j in range(n):
+            if i >= j:
+                simplified.iat[i, j] = ''  # 清除對角線與下三角
+    return simplified
+
+def style_simplified_df(df, intersection_to_cluster, cluster_colors):
+    def highlight(val, row_idx, col_idx):
+        label1 = df.index[row_idx]
+        label2 = df.columns[col_idx]
+        key1 = (label1, label2)
+        key2 = (label2, label1)
+
+        if key1 in intersection_to_cluster:
+            cid = intersection_to_cluster[key1]
+        elif key2 in intersection_to_cluster:
+            cid = intersection_to_cluster[key2]
+        else:
+            return ''
+        return f'background-color: {cluster_colors[cid]}; color: black'
+
+    styled = df.style
+    for i in range(df.shape[0]):
+        for j in range(df.shape[1]):
+            if i < j:
+                color_style = highlight(df.iat[i, j], i, j)
+                styled = styled.set_properties(
+                    subset=pd.IndexSlice[df.index[i], df.columns[j]],
+                    **{
+                        'background-color': color_style.replace('background-color:', '').split(';')[0],
+                        'color': 'black'
+                    }
+                )
+    return styled
+
+# 簡化矩陣（上三角 + 無對角線）
+df_simplified = simplify_matrix(df_matrix, intersection_to_cluster, cluster_colors)
+styled_df_simplified = style_simplified_df(df_simplified, intersection_to_cluster, cluster_colors)
+styled_df_simplified
+
+def filter_row_lonely_intersections(df_simplified, intersection_to_cluster):
+    df_filtered = df_simplified.copy()
+
+    for i in range(df_filtered.shape[0]):
+        row_label = df_filtered.index[i]
+        # 記錄每個 cluster 在這一 row 出現幾次
+        cluster_count = {}
+
+        for j in range(df_filtered.shape[1]):
+            if i >= j:
+                continue  # 只處理上三角
+
+            col_label = df_filtered.columns[j]
+            key = (row_label, col_label)
+            if key not in intersection_to_cluster:
+                continue
+
+            cluster_id = intersection_to_cluster[key]
+            cluster_count[cluster_id] = cluster_count.get(cluster_id, 0) + 1
+
+        # 再次走過這一 row，把孤立的 intersection 清除
+        for j in range(df_filtered.shape[1]):
+            if i >= j:
+                continue
+
+            col_label = df_filtered.columns[j]
+            key = (row_label, col_label)
+            if key not in intersection_to_cluster:
+                continue
+
+            cluster_id = intersection_to_cluster[key]
+            if cluster_count[cluster_id] <= 1:
+                # 如果這個 cluster 只出現 1 次，就清除它
+                df_filtered.iat[i, j] = '—'
+
+    return df_filtered
+
+df_filtered = filter_row_lonely_intersections(df_simplified, intersection_to_cluster)
+
+# 再上色
+styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+styled_filtered
+
+def filter_lonely_column_intersections(df_simplified, intersection_to_cluster):
+    df_filtered = df_simplified.copy()
+
+    for j in range(df_filtered.shape[1]):
+        col_label = df_filtered.columns[j]
+        # 記錄每個 cluster 在這一 col 出現幾次
+        cluster_count = {}
+
+        for i in range(df_filtered.shape[0]):
+            if i >= j:
+                continue  # 只處理上三角
+
+            row_label = df_filtered.index[i]
+            key = (row_label, col_label)
+            if key not in intersection_to_cluster:
+                continue
+
+            cluster_id = intersection_to_cluster[key]
+            cluster_count[cluster_id] = cluster_count.get(cluster_id, 0) + 1
+
+        # 再次走過這一 column，把孤立的 intersection 清除
+        for i in range(df_filtered.shape[0]):
+            if i >= j:
+                continue
+
+            row_label = df_filtered.index[i]
+            key = (row_label, col_label)
+            if key not in intersection_to_cluster:
+                continue
+
+            cluster_id = intersection_to_cluster[key]
+            if cluster_count[cluster_id] <= 1:
+                df_filtered.iat[i, j] = '—'
+
+    return df_filtered
+
+df_filtered_column = filter_lonely_column_intersections(df_simplified, intersection_to_cluster)
+
+# 上色顯示
+styled_filtered_column = style_simplified_df(df_filtered_column, intersection_to_cluster, cluster_colors)
+styled_filtered_column
+
+def filter_lonely_row_column_intersections(df_simplified, intersection_to_cluster):
+    df_filtered = df_simplified.copy()
+
+    # 記錄每個 row 和 column 中，每個 cluster 出現次數
+    row_cluster_count = {}
+    col_cluster_count = {}
+
+    # 先走過一次，統計 row 和 column 的 cluster 數量
+    for i in range(df_filtered.shape[0]):
+        row_label = df_filtered.index[i]
+        for j in range(df_filtered.shape[1]):
+            col_label = df_filtered.columns[j]
+            if i >= j:
+                continue  # 只看上三角
+
+            key = (row_label, col_label)
+            if key not in intersection_to_cluster:
+                continue
+
+            cluster_id = intersection_to_cluster[key]
+
+            row_cluster_count.setdefault(row_label, {}).setdefault(cluster_id, 0)
+            row_cluster_count[row_label][cluster_id] += 1
+
+            col_cluster_count.setdefault(col_label, {}).setdefault(cluster_id, 0)
+            col_cluster_count[col_label][cluster_id] += 1
+
+    # 再走一次，清掉 row 和 column 都只有1個的交點
+    for i in range(df_filtered.shape[0]):
+        row_label = df_filtered.index[i]
+        for j in range(df_filtered.shape[1]):
+            col_label = df_filtered.columns[j]
+            if i >= j:
+                continue  # 只看上三角
+
+            key = (row_label, col_label)
+            if key not in intersection_to_cluster:
+                continue
+
+            cluster_id = intersection_to_cluster[key]
+
+            # 如果在 row 和 column 上，這個 cluster 都只有出現 1 次
+            if row_cluster_count[row_label][cluster_id] <= 1 and col_cluster_count[col_label][cluster_id] <= 1:
+                df_filtered.iat[i, j] = '—'
+
+    return df_filtered
+
+df_filtered = filter_lonely_row_column_intersections(df_simplified, intersection_to_cluster)
+
+# 上色
+styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+styled_filtered
+
+def filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, start_col_idx=0):
+    df_result = df_filtered.copy()
+
+    for j in range(start_col_idx, df_result.shape[1]):
+        col_label = df_result.columns[j]
+        clusters_in_column = set()
+
+        for i in range(df_result.shape[0]):
+            row_label = df_result.index[i]
+            if i >= j:
+                continue
+
+            key = (row_label, col_label)
+            if key not in intersection_to_cluster:
+                continue
+
+            cluster_id = intersection_to_cluster[key]
+            clusters_in_column.add(cluster_id)
+
+        if len(clusters_in_column) > 1:
+            print(f"Column '{col_label}' (index {j}) has multiple clusters: {clusters_in_column}. Marking and stopping.")
+            for i in range(df_result.shape[0]):
+                if i >= j:
+                    continue
+                df_result.iat[i, j] = '—'
+            return df_result, j + 1  # 回傳下一次要從哪個 column 開始
+
+    print("No more columns with multiple clusters.")
+    return df_result, df_result.shape[1]
+
+
+# 第一次處理
+df_filtered, next_col_idx = filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, start_col_idx=0)
+
+# 上色
+styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+styled_filtered
+
+df_filtered, next_col_idx = filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, start_col_idx=next_col_idx)
+styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+styled_filtered
+
+# from collections import Counter
+
+# def filter_columns_with_dominant_cluster(df_filtered, intersection_to_cluster, start_col_idx=0):
+#     df_result = df_filtered.copy()
+
+#     for j in range(start_col_idx, df_result.shape[1]):
+#         col_label = df_result.columns[j]
+#         cluster_counter = Counter()
+
+#         # 統計該 column 中所有 cluster 的出現次數
+#         for i in range(df_result.shape[0]):
+#             row_label = df_result.index[i]
+#             if i >= j:
+#                 continue
+
+#             key = (row_label, col_label)
+#             if key in intersection_to_cluster:
+#                 cluster_id = intersection_to_cluster[key]
+#                 cluster_counter[cluster_id] += 1
+
+#         if len(cluster_counter) > 1:
+#             # 找出最多次的 cluster
+#             most_common = cluster_counter.most_common()
+#             top_count = most_common[0][1]
+#             top_clusters = [cid for cid, count in most_common if count == top_count]
+
+#             if len(top_clusters) == 1:
+#                 dominant_cluster = top_clusters[0]
+#                 print(f"Column '{col_label}' (index {j}) has dominant cluster: {dominant_cluster}. Keeping only that cluster.")
+#                 for i in range(df_result.shape[0]):
+#                     if i >= j:
+#                         continue
+#                     key = (df_result.index[i], col_label)
+#                     if intersection_to_cluster.get(key) != dominant_cluster:
+#                         df_result.iat[i, j] = '—'
+#             else:
+#                 print(f"Column '{col_label}' (index {j}) has no unique dominant cluster: {top_clusters}. Removing entire column.")
+#                 for i in range(df_result.shape[0]):
+#                     if i >= j:
+#                         continue
+#                     df_result.iat[i, j] = '—'
+
+#             return df_result, j + 1  # 回傳下一次要從哪個 column 開始
+
+#     print("No more columns with multiple clusters.")
+#     return df_result, df_result.shape[1]
+
+
+# # 第一次處理
+# df_filtered, next_col_idx = filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, start_col_idx=0)
+
+# # 上色
+# styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+# styled_filtered
+
+# df_filtered, next_col_idx = filter_columns_with_dominant_cluster(df_filtered, intersection_to_cluster, start_col_idx=next_col_idx)
+# styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+# styled_filtered
+
+start_col = 0
+df_simplified = simplify_matrix(df_matrix, intersection_to_cluster, cluster_colors)
+styled_df_simplified = style_simplified_df(df_simplified, intersection_to_cluster, cluster_colors)
+# styled_df_simplified
+
+df_filtered = filter_lonely_row_column_intersections(df_simplified, intersection_to_cluster)
+styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+# styled_filtered
+
+
+df_filtered, next_col_idx = filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, start_col_idx=0)
+styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+# styled_filtered
+
+while(next_col_idx!=df_filtered.shape[1]):
+    print(next_col_idx)
+    df_filtered = filter_lonely_row_column_intersections(df_filtered, intersection_to_cluster)
+    styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+
+    df_filtered, next_col_idx = filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, start_col_idx=next_col_idx)
+    styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+
+styled_filtered
+
+# import pandas as pd
+
+# def save_remaining_coordinates(df_filtered, intersection_points_dict, output_filename="remaining_coordinates.xlsx"):
+#     remaining_coords = []
+
+#     for i in range(df_filtered.shape[0]):
+#         for j in range(df_filtered.shape[1]):
+#             if i >= j:
+#                 continue  # 只看上三角
+
+#             row_label = df_filtered.index[i]
+#             col_label = df_filtered.columns[j]
+
+#             if df_filtered.iat[i, j] != '—':
+#                 key = (row_label, col_label)
+#                 if key in intersection_points_dict:
+#                     lat, lon = intersection_points_dict[key]
+#                     remaining_coords.append({
+#                         "row": row_label,
+#                         "col": col_label,
+#                         "Latitude": round(lat, 7),   # 可選：增加精度控制避免浮點微小差異影響
+#                         "Longitude": round(lon, 7)
+#                     })
+
+#     if remaining_coords:
+#         df_coords = pd.DataFrame(remaining_coords)
+
+#         # 根據 Latitude 和 Longitude 移除重複點
+#         df_coords_unique = df_coords.drop_duplicates(subset=["Latitude", "Longitude"])
+
+#         df_coords_unique.to_excel(output_filename, index=False)
+#         print(f"✅ 已移除重複經緯度並儲存至 {output_filename}，共 {len(df_coords_unique)} 筆")
+#     else:
+#         print("⚠️ 沒有可儲存的交點座標（所有都被刪除）")
+
+# # 使用範例
+# save_remaining_coordinates(df_filtered, intersection_points_dict)
+
+import os
+import pandas as pd
+from openpyxl import load_workbook
+
+def save_remaining_coordinates(df_filtered, intersection_points_dict, output_filename="remaining_coordinates.xlsx"):
+    remaining_coords = []
+
+    for i in range(df_filtered.shape[0]):
+        for j in range(df_filtered.shape[1]):
+            if i >= j:
+                continue  # 只看上三角
+
+            row_label = df_filtered.index[i]
+            col_label = df_filtered.columns[j]
+
+            if df_filtered.iat[i, j] != '—':
+                key = (row_label, col_label)
+                if key in intersection_points_dict:
+                    lat, lon = intersection_points_dict[key]
+                    remaining_coords.append({
+                        "Lat": round(lat, 8),
+                        "Lon": round(lon, 8)
+                    })
+
+    if not remaining_coords:
+        print("⚠️ 沒有可儲存的交點座標（所有都被刪除）")
+        return
+
+    df_coords = pd.DataFrame(remaining_coords)
+    df_coords_unique = df_coords.drop_duplicates(subset=["Lat", "Lon"])
+
+    if os.path.exists(output_filename):
+        # 若檔案存在，附加資料
+        with pd.ExcelWriter(output_filename, mode='a', engine='openpyxl', if_sheet_exists='overlay') as writer:
+            # 讀取現有資料
+            existing_df = pd.read_excel(output_filename)
+            # 合併並去重
+            combined_df = pd.concat([existing_df, df_coords_unique], ignore_index=True)
+            combined_df = combined_df.drop_duplicates(subset=["Lat", "Lon"])
+            combined_df.to_excel(writer, index=False)
+        print(f"✅ 已移除重複經緯度並儲存至 {output_filename}，共 {len(df_coords_unique)} 筆")
+        print(f"📌 已附加並儲存至 {output_filename}，目前共 {len(combined_df)} 筆")
+    else:
+        # 檔案不存在，建立新檔
+        df_coords_unique.to_excel(output_filename, index=False)
+        print(f"✅ 建立新檔並儲存至 {output_filename}，共 {len(df_coords_unique)} 筆")
+
+# import pandas as pd
+# import numpy as np
+# from shapely.geometry import LineString, Point
+# from collections import defaultdict
+# import matplotlib.pyplot as plt
+# import plotly.graph_objects as go
+# import numpy as np
+# import plotly.express as px
+
+# for grid_id in grid_info:
+#   intersection_lobs = [
+#       [float(a), float(b), float(c), float(d)]
+#       for a, b, c, d in grid_id['intersection_lobs']
+#   ]
+
+#   # 分群根據起點
+#   start_point_groups = defaultdict(list)
+#   for lob in intersection_lobs:
+#       start = (lob[0], lob[1])  # (lat, lon)
+#       start_point_groups[start].append(lob)
+
+#   # 標記 A1, A2, ..., B1, ...
+#   labels = {}
+#   label_prefix = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+#   lob_list = []
+#   label_index = 0
+#   for group_start, lobs in sorted(start_point_groups.items()):
+#       for i, lob in enumerate(lobs):
+#           label = f"{label_prefix[label_index]}{i+1}"
+#           labels[tuple(lob)] = label
+#           lob_list.append((lob, label))
+#       label_index += 1
+
+#   # 初始化 matrix 和交點記錄 dict
+#   n = len(lob_list)
+#   matrix = [['-' for _ in range(n)] for _ in range(n)]
+#   label_list = [label for _, label in lob_list]
+#   intersection_points_dict = {}
+
+#   # 比對交點
+#   for i in range(n):
+#       for j in range(n):
+#           if i == j:
+#               matrix[i][j] = '—'
+#               continue
+
+#           lob1, label1 = lob_list[i]
+#           lob2, label2 = lob_list[j]
+#           line1 = LineString([(lob1[1], lob1[0]), (lob1[3], lob1[2])])  # (lon, lat)
+#           line2 = LineString([(lob2[1], lob2[0]), (lob2[3], lob2[2])])
+
+#           if line1.intersects(line2):
+#               intersection = line1.intersection(line2)
+#               if intersection.geom_type == 'Point':
+#                   matrix[i][j] = f"P({label1}x{label2})"
+#                   intersection_points_dict[(label1, label2)] = (intersection.y, intersection.x)  # lat, lon
+#                   intersection_points_dict[(label2, label1)] = (intersection.y, intersection.x)
+
+#   # 顯示矩陣
+#   df_matrix = pd.DataFrame(matrix, columns=label_list, index=label_list)
+#   display(df_matrix)
+
+#   # # DBSCAN 聚類（eps = 2.5 公尺，min_samples=1 表示自己也能成一群）
+#   # distance_matrix = haversine_distance_matrix(coords)
+#   # db = DBSCAN(eps=2.5, min_samples=1, metric='precomputed')
+#   # labels = db.fit_predict(distance_matrix)
+
+#   # # 為每個 cluster 計算 centroid
+#   # cluster_points = defaultdict(list)
+#   # for i, label in enumerate(labels):
+#   #     cluster_points[label].append(coords[i])
+
+#   # cluster_centroids = {
+#   #     label: np.mean(np.array(pts), axis=0)  # 平均 lat/lon
+#   #     for label, pts in cluster_points.items()
+#   # }
+
+#   # # 將所有交點更新為 centroid
+#   # label_keys = list(intersection_points_dict.keys())
+#   # for i, key in enumerate(label_keys):
+#   #     cluster_id = labels[i]
+#   #     centroid = cluster_centroids[cluster_id]
+#   #     intersection_points_dict[key] = tuple(centroid)
+
+#   # fig = go.Figure()
+
+#   coords = []
+#   label_pair_list = []
+
+#   for key, point in intersection_points_dict.items():
+#       coords.append(point)
+#       label_pair_list.append(key)
+
+#   distance_matrix = haversine_distance_matrix(coords)
+#   db = DBSCAN(eps=2.5, min_samples=1, metric='precomputed')
+#   labels = db.fit_predict(distance_matrix)
+
+#   # 建立 label_pair 對應 cluster_id 的 dict
+#   intersection_to_cluster = {
+#       label_pair_list[i]: labels[i]
+#       for i in range(len(labels))
+#   }
+
+#   cluster_points = defaultdict(list)
+#   for i, label in enumerate(labels):
+#       cluster_points[label].append(coords[i])
+
+#   cluster_centroids = {
+#       label: np.mean(np.array(pts), axis=0)  # (lat, lon)
+#       for label, pts in cluster_points.items()
+#   }
+
+#   for key in intersection_points_dict.keys():
+#       cluster_id = intersection_to_cluster[key]
+#       centroid = cluster_centroids[cluster_id]
+#       intersection_points_dict[key] = tuple(centroid)
+
+#   # 取得指定 grid_info
+#   first_grid_info = grid_id
+
+#   # 畫出 grid_calculation（藍色）
+#   grid_calculation = first_grid_info["calculation"]
+#   lat_values = [pt[1] for pt in grid_calculation]
+#   lon_values = [pt[0] for pt in grid_calculation]
+#   fig.add_trace(go.Scattermapbox(
+#       lat=lat_values + [lat_values[0]],
+#       lon=lon_values + [lon_values[0]],
+#       mode='lines',
+#       line=dict(width=2, color='blue'),
+#       name='Grid Calculation'
+#   ))
+
+#   # 畫出 grid_recorded（紅色）
+#   grid_recorded = first_grid_info["recorded"]["grid"]
+#   lat_values = [pt[1] for pt in grid_recorded]
+#   lon_values = [pt[0] for pt in grid_recorded]
+#   fig.add_trace(go.Scattermapbox(
+#       lat=lat_values + [lat_values[0]],
+#       lon=lon_values + [lon_values[0]],
+#       mode='lines',
+#       line=dict(width=2, color='red'),
+#       name='Grid Recorded'
+#   ))
+
+#   # 📌 顯示 intersection points，根據 cluster 上色
+#   unique_cluster_ids = set(labels)
+#   color_scale = px.colors.qualitative.Alphabet  # 或 Set3、Plotly 等配色方案
+
+#   for cluster_id in unique_cluster_ids:
+#       # 所有屬於這個 cluster 的交點索引
+#       indices = np.where(labels == cluster_id)[0]
+#       cluster_color = color_scale[cluster_id % len(color_scale)]
+
+#       # 提取交點並加到圖上
+#       for idx in indices:
+#           label_pair = list(intersection_points_dict.keys())[idx]
+#           point = intersection_points_dict[label_pair]
+#           fig.add_trace(go.Scattermapbox(
+#               lat=[point[0]],
+#               lon=[point[1]],
+#               mode='markers+text',
+#               marker=dict(size=10, color=cluster_color),
+#               text=[f"Cluster {cluster_id}"],
+#               textposition="top right",
+#               name=f"Intersection Cluster {cluster_id}",
+#               showlegend=False
+#           ))
+
+#   # 計算地圖中心
+#   all_lats = [pt[1] for pt in grid_recorded + grid_calculation]
+#   all_lons = [pt[0] for pt in grid_recorded + grid_calculation]
+
+#   fig.update_layout(
+#       mapbox=dict(
+#           style='open-street-map',
+#           zoom=15,
+#           center=dict(
+#               lat=np.mean(all_lats),
+#               lon=np.mean(all_lons)
+#           )
+#       ),
+#       height=800,
+#       margin=dict(l=0, r=0, t=0, b=0),
+#       showlegend=True,
+#       legend=dict(
+#           yanchor="top",
+#           y=0.99,
+#           xanchor="left",
+#           x=0.01,
+#           bgcolor='rgba(255,255,255,0.8)'
+#       )
+#   )
+
+#   fig.show()
+
+#   start_col = 0
+#   df_simplified = simplify_matrix(df_matrix, intersection_to_cluster, cluster_colors)
+#   styled_df_simplified = style_simplified_df(df_simplified, intersection_to_cluster, cluster_colors)
+#   # styled_df_simplified
+
+#   df_filtered = filter_lonely_row_column_intersections(df_simplified, intersection_to_cluster)
+#   styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+#   # styled_filtered
+
+
+#   df_filtered, next_col_idx = filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, start_col_idx=0)
+#   styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+#   # styled_filtered
+
+#   while(next_col_idx!=df_filtered.shape[1]):
+#       print(next_col_idx)
+#       df_filtered = filter_lonely_row_column_intersections(df_filtered, intersection_to_cluster)
+#       styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+
+#       df_filtered, next_col_idx = filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, start_col_idx=next_col_idx)
+#       styled_filtered = style_simplified_df(df_filtered, intersection_to_cluster, cluster_colors)
+
+#   styled_filtered
+#   save_remaining_coordinates(df_filtered, intersection_points_dict)
+
+import pandas as pd
+import numpy as np
+from shapely.geometry import LineString
+from collections import defaultdict
+import plotly.graph_objects as go
+import plotly.express as px
+from sklearn.cluster import DBSCAN
+
+for grid_id in grid_info:
+    intersection_lobs = [
+        [float(a), float(b), float(c), float(d)]
+        for a, b, c, d in grid_id['intersection_lobs']
+    ]
+
+    # Group LOBs by start point
+    start_point_groups = defaultdict(list)
+    for lob in intersection_lobs:
+        start = (lob[0], lob[1])
+        start_point_groups[start].append(lob)
+
+    labels = {}
+    label_prefix = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+    lob_list = []
+    label_index = 0
+    for _, lobs in sorted(start_point_groups.items()):
+        for i, lob in enumerate(lobs):
+            label = f"{label_prefix[label_index]}{i+1}"
+            labels[tuple(lob)] = label
+            lob_list.append((lob, label))
+        label_index += 1
+
+    n = len(lob_list)
+    matrix = [['-' for _ in range(n)] for _ in range(n)]
+    label_list = [label for _, label in lob_list]
+    intersection_points_dict = {}
+
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                matrix[i][j] = '—'
+                continue
+            lob1, label1 = lob_list[i]
+            lob2, label2 = lob_list[j]
+            line1 = LineString([(lob1[1], lob1[0]), (lob1[3], lob1[2])])
+            line2 = LineString([(lob2[1], lob2[0]), (lob2[3], lob2[2])])
+            if line1.intersects(line2):
+                inter = line1.intersection(line2)
+                if inter.geom_type == 'Point':
+                    matrix[i][j] = f"P({label1}x{label2})"
+                    intersection_points_dict[(label1, label2)] = (inter.y, inter.x)
+                    intersection_points_dict[(label2, label1)] = (inter.y, inter.x)
+
+    if intersection_points_dict:
+        coords = list(intersection_points_dict.values())
+        label_pair_list = list(intersection_points_dict.keys())
+
+        distance_matrix = haversine_distance_matrix(coords)
+        db = DBSCAN(eps=2, min_samples=1, metric="precomputed")
+        cluster_labels = db.fit_predict(distance_matrix)
+
+        # ... (Rest of the code for clustering, centroid calculation, etc.)
+
+    else:
+        print(f"No intersection points found in grid ID: {grid_id}")
+        # Handle the case where there are no intersections, e.g., skip processing or assign a default value
+        continue  # Skip to the next grid_id
+
+    intersection_to_cluster = {
+        label_pair_list[i]: cluster_labels[i]
+        for i in range(len(cluster_labels))
+    }
+
+    cluster_points = defaultdict(list)
+    for i, cluster_id in enumerate(cluster_labels):
+        cluster_points[cluster_id].append(coords[i])
+
+    cluster_centroids = {
+        cid: np.mean(np.array(pts), axis=0)
+        for cid, pts in cluster_points.items()
+    }
+
+    for key in intersection_points_dict:
+        cid = intersection_to_cluster[key]
+        intersection_points_dict[key] = tuple(cluster_centroids[cid])
+
+    fig = go.Figure()
+
+    for key in ['calculation', 'recorded']:
+        grid = grid_id[key]['grid'] if key == 'recorded' else grid_id[key]
+        lats = [pt[1] for pt in grid] + [grid[0][1]]
+        lons = [pt[0] for pt in grid] + [grid[0][0]]
+        fig.add_trace(go.Scattermapbox(
+            lat=lats, lon=lons, mode='lines',
+            line=dict(width=2, color='blue' if key == 'calculation' else 'red'),
+            name=f"Grid {key.title()}"
+        ))
+
+    unique_clusters = set(cluster_labels)
+    color_scale = px.colors.qualitative.Alphabet
+
+    for cid in unique_clusters:
+        idxs = np.where(cluster_labels == cid)[0]
+        color = color_scale[cid % len(color_scale)]
+        for i in idxs:
+            pt = cluster_centroids[cid]
+            # fig.add_trace(go.Scattermapbox(
+            #     lat=[pt[0]], lon=[pt[1]], mode='markers+text',
+            #     marker=dict(size=10, color=color),
+            #     text=[f"Cluster {cid}"],
+            #     textposition="top right", showlegend=False
+            # ))
+
+    all_lats = [pt[1] for pt in grid_id['recorded']['grid'] + grid_id['calculation']]
+    all_lons = [pt[0] for pt in grid_id['recorded']['grid'] + grid_id['calculation']]
+
+    # fig.update_layout(
+    #     mapbox=dict(style='open-street-map', zoom=15,
+    #                 center=dict(lat=np.mean(all_lats), lon=np.mean(all_lons))),
+    #     height=800, margin=dict(l=0, r=0, t=0, b=0), showlegend=True
+    # )
+
+    # fig.show()
+
+    df_simplified = simplify_matrix(df_matrix, intersection_to_cluster, cluster_colors)
+    df_filtered = filter_lonely_row_column_intersections(df_simplified, intersection_to_cluster)
+    df_filtered, next_col_idx = filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, 0)
+
+    while next_col_idx != df_filtered.shape[1]:
+        df_filtered = filter_lonely_row_column_intersections(df_filtered, intersection_to_cluster)
+        df_filtered, next_col_idx = filter_columns_with_multiple_clusters_stepwise(df_filtered, intersection_to_cluster, next_col_idx)
+
+    save_remaining_coordinates(df_filtered, intersection_points_dict)
