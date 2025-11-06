@@ -48,6 +48,8 @@ print("Done.")
 
 # prepare required functions
 import math
+import json
+import time
 
 def decode_polyline(polyline_str):
     '''Pass a Google Maps encoded polyline string; returns list of lat/lon pairs'''
@@ -498,6 +500,7 @@ path2 = workingdirectory + 'resized/'
 savepreddir = workingdirectory + 'PolePredictionResults/'
 
 totaldownload = 0
+failed_requests = 0
 
 clean_directory('/content/drive/MyDrive/論文研究📚/Street_view/Streetview from junior/detect/yolov5/runs/detect')
 
@@ -509,12 +512,25 @@ for rr in range(0,len(RouteIDs)):
 
   allpanoid = []
   for panoLatLon in Pts2downloadPano:
-    pano = streetview.find_panorama(lat=panoLatLon[0], lon=panoLatLon[1])
-    if bool(pano):
-      panoid = pano.id # pano id
-      panolat = pano.lat # pano latitude
-      panolon = pano.lon # pano longitude
-      allpanoid.append([panoid, panolat, panolon])
+    try:
+      pano = streetview.find_panorama(lat=panoLatLon[0], lon=panoLatLon[1])
+      if bool(pano):
+        panoid = pano.id # pano id
+        panolat = pano.lat # pano latitude
+        panolon = pano.lon # pano longitude
+        allpanoid.append([panoid, panolat, panolon])
+    except json.JSONDecodeError as e:
+      failed_requests += 1
+      print(f'\nJSONDecodeError at location ({panoLatLon[0]}, {panoLatLon[1]}): {str(e)}')
+      print(f'Skipping this location and continuing... (Total failed: {failed_requests})')
+      time.sleep(1)  # Add a small delay to avoid rate limiting
+      continue
+    except Exception as e:
+      failed_requests += 1
+      print(f'\nUnexpected error at location ({panoLatLon[0]}, {panoLatLon[1]}): {str(e)}')
+      print(f'Skipping this location and continuing... (Total failed: {failed_requests})')
+      time.sleep(1)
+      continue
   PanoInfoFinal = pd.DataFrame(allpanoid,columns=['panoid','lat','lon']).drop_duplicates() #driving trajectory
 
   intersections = []
@@ -524,7 +540,7 @@ for rr in range(0,len(RouteIDs)):
     poleLOB = [] # proposed LOB [start coor(camera), end coor]
     # for pp in range(0,len(PanoInfoFinal)):
     for pp in PanoInfoFinal.index:
-      print('\r','Progress: route = {}/{}; pano = {}/{}; download = {}'.format(rr+1,len(RouteIDs),pp+1,len(PanoInfoFinal.index),totaldownload), end = '')
+      print('\r','Progress: route = {}/{}; pano = {}/{}; download = {}; failed = {}'.format(rr+1,len(RouteIDs),pp+1,len(PanoInfoFinal.index),totaldownload,failed_requests), end = '')
       lat = PanoInfoFinal['lat'][pp]
       lon = PanoInfoFinal['lon'][pp]
       pano_coor = [PanoInfoFinal['lat'][pp], PanoInfoFinal['lon'][pp]] # pano coordinates
